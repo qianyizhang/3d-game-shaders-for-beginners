@@ -101,11 +101,16 @@
 <img src="https://i.imgur.com/y5XcReP.gif" alt="Running The Demo" title="Running The Demo">
 </p>
 
-<p>After you've built the example code, you can now run the executable or demo.</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1"></a><span class="ex">./3d-game-shaders-for-beginners</span></span></code></pre></div>
-<p>Here's how you run it on Linux or Mac.</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1"></a><span class="ex">3d-game-shaders-for-beginners.exe</span></span></code></pre></div>
-<p>Here's how you run it on Windows.</p>
+<p>Run the executable from the <code>demonstration</code> directory, where it can find its shaders and other assets.</p>
+<h3 id="linux">Linux</h3>
+<div class="sourceCode" id="cb1"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">./3d-game-shaders-for-beginners</span></span></code></pre></div>
+<h3 id="mac">Mac</h3>
+<p>Use the SDK path from the build step. Set <code>PANDA_PRC_DIR</code> so Panda3D loads the demo settings before creating the audio manager.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="va">PANDA3D</span><span class="op">=</span>/Library/Developer/Panda3D</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="va">PANDA_PRC_DIR</span><span class="op">=</span><span class="st">&quot;</span><span class="va">$PWD</span><span class="st">&quot;</span> <span class="va">DYLD_LIBRARY_PATH</span><span class="op">=</span><span class="st">&quot;</span><span class="va">$PANDA3D</span><span class="st">/lib&quot;</span> <span class="dt">\</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="ex">./3d-game-shaders-for-beginners</span></span></code></pre></div>
+<h3 id="windows">Windows</h3>
+<div class="sourceCode" id="cb3"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">3d-game-shaders-for-beginners.exe</span></span></code></pre></div>
 <h3 id="demo-controls">Demo Controls</h3>
 <p>The demo comes with both keyboard and mouse controls to move the camera around, toggle on and off the different effects, adjust the fog, and view the various different framebuffer textures.</p>
 <h4 id="mouse">Mouse</h4>

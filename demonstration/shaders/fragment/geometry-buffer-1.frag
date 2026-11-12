@@ -36,11 +36,8 @@ in vec3 tangent;
 in vec2 diffuseCoord;
 in vec2 normalCoord;
 
-out vec4 positionOut;
-out vec4 normalOut;
-out vec4 reflectionMaskOut;
-out vec4 refractionMaskOut;
-out vec4 foamMaskOut;
+// Attachments in order: position, normal, reflection mask, refraction mask, foam mask.
+out vec4 p3d_FragData[5];
 
 void main() {
   vec2 flow   = texture(flowTexture,  normalCoord).xy;
@@ -96,9 +93,9 @@ void main() {
 
   vec4 foamPattern            = texture(foamPatternTexture, foamUv);
 
-  positionOut         = vertexPosition;
-  normalOut           = vec4(normal, 1.0);
-  reflectionMaskOut   = reflectionMask;
-  refractionMaskOut   = refractionMask;
-  foamMaskOut         = foamPattern;
+  p3d_FragData[0] = vertexPosition;
+  p3d_FragData[1] = vec4(normal, 1.0);
+  p3d_FragData[2] = reflectionMask;
+  p3d_FragData[3] = refractionMask;
+  p3d_FragData[4] = foamPattern;
 }

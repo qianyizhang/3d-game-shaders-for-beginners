@@ -87,8 +87,8 @@ in vec3 tangent;
 in vec2 diffuseCoord;
 in vec2 normalCoord;
 
-out vec4 out0;
-out vec4 out1;
+// Panda3D binds p3d_FragData to attachment 0: base color, then specular.
+out vec4 p3d_FragData[2];
 
 void main() {
   vec3  shadowColor   = pow(vec3(0.149, 0.220, 0.227), vec3(gamma.x));
@@ -323,16 +323,11 @@ void main() {
 
   vec3 emission = p3d_Material.emission.rgb * max(0.1, pow(sunPosition, 0.4));
 
-  out0.a   =   diffuseColor.a;
-  out0.rgb =   ambient.rgb
-             + diffuse.rgb
-             + rimLight.rgb
-             + emission.rgb;
+  p3d_FragData[0] = vec4(ambient + diffuse.rgb + rimLight.rgb + emission, diffuseColor.a);
 
-  if (isWater.x == 1) { out0.a = 0.0; }
+  if (isWater.x == 1) { p3d_FragData[0].a = 0.0; }
 
-  out1.a   = diffuseColor.a;
-  out1.rgb = specular.rgb;
+  p3d_FragData[1] = vec4(specular.rgb, diffuseColor.a);
 
-  if (isParticle.x == 1) { out1.rgb = vec3(0.0); }
+  if (isParticle.x == 1) { p3d_FragData[1].rgb = vec3(0.0); }
 }

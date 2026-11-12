@@ -17,6 +17,11 @@ Typically these vectors are color vectors `(r, g, b, a)` but they could also be 
 For each bound texture, the fragment shader can output a different vector.
 For example you could output a vertex's position and normal in a single pass.
 
+When a shader writes to several textures, each output must go to the attachment the next pass expects.
+The demo uses Panda3D's `p3d_FragData` array, which starts at attachment 0.
+For example, depth of field writes scene color to `p3d_FragData[0]` and the blur mask to `p3d_FragData[1]`.
+Declaring separate outputs without binding them lets the driver choose their order.
+
 Most of the example code dealing with Panda3D involves setting up
 [framebuffer textures](https://www.panda3d.org/manual/?title=Render-to-Texture_and_Image_Postprocessing).
 To keep things straightforward, nearly all of the fragment shaders in the example code have only one output.
@@ -34,7 +39,7 @@ This setup will go through each of the mill scene's vertexes and corresponding f
 In this setup, the example code performs the following.
 
 - Stores geometry data (like vertex position or normal) for later use.
-- Stores material data (like the diffuse color) for later use.
+- Stores lit base color and specular lighting in separate textures for later use.
 - UV maps the various textures (diffuse, normal, shadow, etc.).
 - Calculates the ambient, diffuse, specular, and emission lighting.
 

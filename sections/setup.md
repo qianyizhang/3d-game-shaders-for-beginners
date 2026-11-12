@@ -91,9 +91,8 @@ Panda3D does provide some conveniences.
 I have pointed these out so you can either find an equivalent convenience provided by your stack or
 replicate it yourself, if your stack doesn't provide something equivalent.
 
-Three Panda3D configurations were changed for the purposes of the demo program.
-You can find these in [config.prc](../demonstration/config.prc).
-The configurations changed were
+The demo sets its Panda3D options in [panda3d-prc-file.prc](../demonstration/panda3d-prc-file.prc).
+Three options relevant to these examples are
 `gl-coordinate-system default`,
 `textures-power-2 down`, and
 `textures-auto-power-2 1`.

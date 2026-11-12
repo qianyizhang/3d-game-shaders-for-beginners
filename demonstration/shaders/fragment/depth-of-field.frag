@@ -14,8 +14,8 @@ uniform vec2 mouseFocusPoint;
 uniform vec2 nearFar;
 uniform vec2 enabled;
 
-out vec4 fragColor;
-out vec4 fragColor1;
+// Attachment 0 is scene color; attachment 1 is the blur mask.
+out vec4 p3d_FragData[2];
 
 void main() {
   float minDistance =  8.0;
@@ -28,13 +28,14 @@ void main() {
 
   vec4 focusColor = texture(focusTexture, texCoord);
 
-  fragColor = focusColor;
+  p3d_FragData[0] = focusColor;
+  p3d_FragData[1] = vec4(0.0);
 
   if (enabled.x != 1) { return; }
 
   vec4 position = texture(positionTexture, texCoord);
 
-  if (position.a <= 0) { fragColor1 = vec4(1.0); return; }
+  if (position.a <= 0) { p3d_FragData[1] = vec4(1.0); return; }
 
   vec4 outOfFocusColor = texture(outOfFocusTexture, texCoord);
   vec4 focusPoint      = texture(positionTexture,   mouseFocusPoint);
@@ -46,6 +47,6 @@ void main() {
       , length(position - focusPoint)
       );
 
-  fragColor  = mix(focusColor, outOfFocusColor, blur);
-  fragColor1 = vec4(blur);
+  p3d_FragData[0] = mix(focusColor, outOfFocusColor, blur);
+  p3d_FragData[1] = vec4(blur);
 }

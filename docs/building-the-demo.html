@@ -133,34 +133,17 @@
 <span id="cb3-12"><a href="#cb3-12"></a>  -lpthread</span></code></pre></div>
 <p>For more help, see the <a href="https://www.panda3d.org/manual/?title=How_to_compile_a_C++_Panda3D_program_on_Linux">Panda3D manual</a>.</p>
 <h3 id="mac">Mac</h3>
-<p>Start by installing the <a href="https://www.panda3d.org/download/sdk-1-10-9/">Panda3D SDK</a> for Mac.</p>
-<p>Make sure to locate where the Panda3D headers and libraries are.</p>
-<p>Next clone this repository and change directory into it.</p>
-<div class="sourceCode" id="cb4"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1"></a><span class="fu">git</span> clone https://github.com/lettier/3d-game-shaders-for-beginners.git</span>
-<span id="cb4-2"><a href="#cb4-2"></a><span class="bu">cd</span> 3d-game-shaders-for-beginners</span></code></pre></div>
-<p>Now compile the source code into an object file. You'll have to find where the Python 2.7 and Panda3D include directories are.</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1"></a><span class="fu">clang</span>++ \</span>
-<span id="cb5-2"><a href="#cb5-2"></a>  -c main.cxx \</span>
-<span id="cb5-3"><a href="#cb5-3"></a>  -o 3d-game-shaders-for-beginners.o \</span>
-<span id="cb5-4"><a href="#cb5-4"></a>  -std=gnu++11 \</span>
-<span id="cb5-5"><a href="#cb5-5"></a>  -g \</span>
-<span id="cb5-6"><a href="#cb5-6"></a>  -O2 \</span>
-<span id="cb5-7"><a href="#cb5-7"></a>  -I/path/to/python/include/ \</span>
-<span id="cb5-8"><a href="#cb5-8"></a>  -I/path/to/panda3d/include/</span></code></pre></div>
-<p>With the object file created, create the executable by linking the object file to its dependencies. You'll need to track down where the Panda3D libraries are located.</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1"></a><span class="fu">clang</span>++ \</span>
-<span id="cb6-2"><a href="#cb6-2"></a>  3d-game-shaders-for-beginners.o \</span>
-<span id="cb6-3"><a href="#cb6-3"></a>  -o 3d-game-shaders-for-beginners \</span>
-<span id="cb6-4"><a href="#cb6-4"></a>  -L/path/to/panda3d/lib \</span>
-<span id="cb6-5"><a href="#cb6-5"></a>  -lp3framework \</span>
-<span id="cb6-6"><a href="#cb6-6"></a>  -lpanda \</span>
-<span id="cb6-7"><a href="#cb6-7"></a>  -lpandafx \</span>
-<span id="cb6-8"><a href="#cb6-8"></a>  -lpandaexpress \</span>
-<span id="cb6-9"><a href="#cb6-9"></a>  -lpandaphysics \</span>
-<span id="cb6-10"><a href="#cb6-10"></a>  -lp3dtoolconfig \</span>
-<span id="cb6-11"><a href="#cb6-11"></a>  -lp3dtool \</span>
-<span id="cb6-12"><a href="#cb6-12"></a>  -lpthread</span></code></pre></div>
-<p>For more help, see the <a href="https://www.panda3d.org/manual/?title=How_to_compile_a_C++_Panda3D_program_on_macOS">Panda3D manual</a>.</p>
+<p>Install the <a href="https://www.panda3d.org/download/sdk-1-10-16/">Panda3D 1.10.16 SDK</a> for Mac. In the installer, select <strong>Customize → C++ Header Files</strong>. This SDK ships Intel C++ libraries, so Apple Silicon Macs run the demo through Rosetta. Use Apple Clang from Xcode or the Xcode Command Line Tools.</p>
+<p>From the repository root, compile and link the demo:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> demonstration</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="va">PANDA3D</span><span class="op">=</span>/Library/Developer/Panda3D</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="fu">clang</span>++ <span class="at">-arch</span> x86_64 <span class="at">-std</span><span class="op">=</span>c++11 <span class="at">-O2</span> <span class="dt">\</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">-I</span><span class="st">&quot;</span><span class="va">$PANDA3D</span><span class="st">/include&quot;</span> src/main.cxx <span class="dt">\</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">-L</span><span class="st">&quot;</span><span class="va">$PANDA3D</span><span class="st">/lib&quot;</span> <span class="dt">\</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">-lp3framework</span> <span class="at">-lpanda</span> <span class="at">-lpandafx</span> <span class="at">-lpandaexpress</span> <span class="at">-lpandaphysics</span> <span class="dt">\</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">-lp3dtoolconfig</span> <span class="at">-lp3dtool</span> <span class="at">-o</span> 3d-game-shaders-for-beginners</span></code></pre></div>
+<p>Use <a href="running-the-demo.html#mac">the Mac launch command</a> to run the demo from this directory.</p>
 <h3 id="windows">Windows</h3>
 <p>Start by <a href="https://www.panda3d.org/manual/?title=Installing_Panda3D_in_Windows">installing</a> the <a href="https://www.panda3d.org/download/sdk-1-10-9/">Panda3D SDK</a> for Windows.</p>
 <p>Make sure to locate where the Panda3D headers and libraries are.</p>

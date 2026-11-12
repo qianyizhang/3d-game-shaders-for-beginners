@@ -31,6 +31,7 @@
 <h2 id="render-to-texture">Render To Texture</h2>
 <p>Instead of rendering/drawing/painting directly to the screen, the example code uses a technique called "render to texture". In order to render to a texture, you'll need to set up a framebuffer and bind a texture to it. Multiple textures can be bound to a single framebuffer.</p>
 <p>The textures bound to the framebuffer hold the vector(s) returned by the fragment shader. Typically these vectors are color vectors <code>(r, g, b, a)</code> but they could also be position or normal vectors <code>(x, y, z, w)</code>. For each bound texture, the fragment shader can output a different vector. For example you could output a vertex's position and normal in a single pass.</p>
+<p>When a shader writes to several textures, each output must go to the attachment the next pass expects. The demo uses Panda3D's <code>p3d_FragData</code> array, which starts at attachment 0. For example, depth of field writes scene color to <code>p3d_FragData[0]</code> and the blur mask to <code>p3d_FragData[1]</code>. Declaring separate outputs without binding them lets the driver choose their order.</p>
 <p>Most of the example code dealing with Panda3D involves setting up <a href="https://www.panda3d.org/manual/?title=Render-to-Texture_and_Image_Postprocessing">framebuffer textures</a>. To keep things straightforward, nearly all of the fragment shaders in the example code have only one output. However, you'll want to output as much as you can each render pass to keep your frames per second (FPS) high.</p>
 <p>There are two framebuffer texture setups found in the example code.</p>
 <p align="center">
@@ -41,7 +42,7 @@
 <p>In this setup, the example code performs the following.</p>
 <ul>
 <li>Stores geometry data (like vertex position or normal) for later use.</li>
-<li>Stores material data (like the diffuse color) for later use.</li>
+<li>Stores lit base color and specular lighting in separate textures for later use.</li>
 <li>UV maps the various textures (diffuse, normal, shadow, etc.).</li>
 <li>Calculates the ambient, diffuse, specular, and emission lighting.</li>
 </ul>

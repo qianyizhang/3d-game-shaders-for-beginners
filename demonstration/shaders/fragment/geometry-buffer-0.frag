@@ -17,8 +17,8 @@ in vec3 tangent;
 
 in vec2 normalCoord;
 
-out vec4 positionOut;
-out vec4 normalOut;
+// Attachments in order: position, normal.
+out vec4 p3d_FragData[2];
 
 void main() {
   vec4 normalTex =
@@ -48,6 +48,6 @@ void main() {
     normal = normalize(vertexNormal);
   }
 
-  positionOut = vertexPosition;
-  normalOut   = vec4(normal, 1);
+  p3d_FragData[0] = vertexPosition;
+  p3d_FragData[1] = vec4(normal, 1);
 }

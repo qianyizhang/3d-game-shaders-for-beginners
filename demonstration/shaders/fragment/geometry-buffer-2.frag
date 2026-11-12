@@ -16,12 +16,12 @@ in vec4 vertexColor;
 
 in vec2 diffuseCoord;
 
-out vec4 positionOut;
-out vec4 smokeMaskOut;
+// Attachments in order: position, smoke mask.
+out vec4 p3d_FragData[2];
 
 void main() {
-  positionOut  = vertexPosition;
-  smokeMaskOut = vec4(0.0);
+  p3d_FragData[0] = vertexPosition;
+  p3d_FragData[1] = vec4(0.0);
 
   if (isSmoke.x == 1) {
     vec4 diffuseColor = texture(p3d_Texture0, diffuseCoord) * vertexColor;
@@ -31,12 +31,13 @@ void main() {
 
     vec4 position = texture(positionTexture, texCoord);
     if (position.a <= 0.0) {
-      positionOut         = diffuseColor.a > 0.0 ? vertexPosition : vec4(0.0);
+      p3d_FragData[0] = diffuseColor.a > 0.0 ? vertexPosition : vec4(0.0);
     } else {
-      positionOut         = mix(position, vertexPosition, diffuseColor.a);
+      p3d_FragData[0] = mix(position, vertexPosition, diffuseColor.a);
     }
 
-    smokeMaskOut     = diffuseColor * vertexColor;
-    smokeMaskOut.rgb = vec3(dot(smokeMaskOut.rgb, vec3(1.0 / 3.0)));
+    vec4 smokeMask = diffuseColor * vertexColor;
+    smokeMask.rgb = vec3(dot(smokeMask.rgb, vec3(1.0 / 3.0)));
+    p3d_FragData[1] = smokeMask;
   }
 }

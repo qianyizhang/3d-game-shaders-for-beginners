@@ -69,50 +69,25 @@ For more help, see the [Panda3D manual](https://www.panda3d.org/manual/?title=Ho
 
 ### Mac
 
-Start by installing the [Panda3D SDK](https://www.panda3d.org/download/sdk-1-10-9/) for Mac.
+Install the [Panda3D 1.10.16 SDK](https://www.panda3d.org/download/sdk-1-10-16/) for Mac.
+In the installer, select **Customize → C++ Header Files**.
+This SDK ships Intel C++ libraries, so Apple Silicon Macs run the demo through Rosetta.
+Use Apple Clang from Xcode or the Xcode Command Line Tools.
 
-Make sure to locate where the Panda3D headers and libraries are.
-
-Next clone this repository and change directory into it.
-
-```bash
-git clone https://github.com/lettier/3d-game-shaders-for-beginners.git
-cd 3d-game-shaders-for-beginners
-```
-
-Now compile the source code into an object file.
-You'll have to find where the Python 2.7 and Panda3D include directories are.
+From the repository root, compile and link the demo:
 
 ```bash
-clang++ \
-  -c main.cxx \
-  -o 3d-game-shaders-for-beginners.o \
-  -std=gnu++11 \
-  -g \
-  -O2 \
-  -I/path/to/python/include/ \
-  -I/path/to/panda3d/include/
+cd demonstration
+PANDA3D=/Library/Developer/Panda3D
+
+clang++ -arch x86_64 -std=c++11 -O2 \
+  -I"$PANDA3D/include" src/main.cxx \
+  -L"$PANDA3D/lib" \
+  -lp3framework -lpanda -lpandafx -lpandaexpress -lpandaphysics \
+  -lp3dtoolconfig -lp3dtool -o 3d-game-shaders-for-beginners
 ```
 
-With the object file created, create the executable by linking the object file to its dependencies.
-You'll need to track down where the Panda3D libraries are located.
-
-```bash
-clang++ \
-  3d-game-shaders-for-beginners.o \
-  -o 3d-game-shaders-for-beginners \
-  -L/path/to/panda3d/lib \
-  -lp3framework \
-  -lpanda \
-  -lpandafx \
-  -lpandaexpress \
-  -lpandaphysics \
-  -lp3dtoolconfig \
-  -lp3dtool \
-  -lpthread
-```
-
-For more help, see the [Panda3D manual](https://www.panda3d.org/manual/?title=How_to_compile_a_C++_Panda3D_program_on_macOS).
+Use [the Mac launch command](running-the-demo.md#mac) to run the demo from this directory.
 
 ### Windows
 

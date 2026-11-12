@@ -12,19 +12,29 @@
 <img src="https://i.imgur.com/y5XcReP.gif" alt="Running The Demo" title="Running The Demo">
 </p>
 
-After you've built the example code, you can now run the executable or demo.
+Run the executable from the `demonstration` directory, where it can find its shaders and other assets.
+
+### Linux
 
 ```bash
 ./3d-game-shaders-for-beginners
 ```
 
-Here's how you run it on Linux or Mac.
+### Mac
+
+Use the SDK path from the build step. Set `PANDA_PRC_DIR` so Panda3D loads the demo settings before creating the audio manager.
+
+```bash
+PANDA3D=/Library/Developer/Panda3D
+PANDA_PRC_DIR="$PWD" DYLD_LIBRARY_PATH="$PANDA3D/lib" \
+  ./3d-game-shaders-for-beginners
+```
+
+### Windows
 
 ```bash
 3d-game-shaders-for-beginners.exe
 ```
-
-Here's how you run it on Windows.
 
 ### Demo Controls
 
