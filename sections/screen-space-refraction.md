@@ -56,7 +56,7 @@ There will be some distortion but not enough to make it worthwhile.
 To use the normal maps instead,
 you'll need to transform the normal mapped normals from tangent space to view space
 just like you did in the [lighting](normal-mapping.md#fragment) calculations.
-You can see this being done in [normal.frag](../demonstration/shaders/fragment/normal.frag).
+The demo does this in [geometry-buffer-1.frag](../demonstration/shaders/fragment/geometry-buffer-1.frag).
 
 ### Position Transformations
 
@@ -125,19 +125,16 @@ uniform vec2 rior;
 
 Refraction has one more adjustable parameter than reflection.
 `rior` is the relative index of refraction or relative refractive index.
-It is the ratio of the refraction indexes of two mediums.
-So for example, going from water to air is `1 / 1.33 ≈ 0.75`.
-The numerator is the refractive index of the medium the light is leaving and
-the denominator is the refractive index of the medium the light is entering.
-An `rior` of one means the light passes right through without being refracted or bent.
-As `rior` grows, the refraction will become a
-[reflection](https://en.wikipedia.org/wiki/Total_internal_reflection).
+Divide the refractive index of the medium the ray leaves by the index of
+the medium it enters. Air to water is about `1 / 1.33 ≈ 0.75`; water to air
+is about `1.33 / 1 ≈ 1.33`.
+A ratio of one leaves the ray direction unchanged.
+When the ratio is greater than one, [total internal reflection](https://en.wikipedia.org/wiki/Total_internal_reflection)
+can occur at sufficiently oblique angles.
+GLSL's [`refract`](https://registry.khronos.org/OpenGL-Refpages/gl4/html/refract.xhtml)
+returns a zero vector in that case; it does not compute a reflected ray.
 
-There's no requirement that `rior` must adhere to the real world.
-The demo uses `1.05`.
-This is completely unrealistic (light does not travel faster through water than air)
-but the realistic setting produced too many artifacts.
-In the end, the distortion only has to be believable—not realistic.
+The demo uses `1.05` as an artistic setting to reduce screen-space artifacts.
 
 <p align="center">
 <img src="https://i.imgur.com/dDOnobK.gif" alt="Adjusting the relative index of refraction." title="Adjusting the relative index of refraction.">
@@ -232,10 +229,10 @@ This mask will determine which fragment does and does not receive a refracted co
 You could use this mask during the refracted UV calculation step or later when you
 actually sample the colors at the refracted UV coordinates.
 
-The mill scene uses the models' material specular as a mask.
-For the demo's purposes,
-the specular map is sufficient but you may want to use a more specialized map.
-Refer back to [screen space reflection](screen-space-reflection.md#specular-map) for how to render the specular map.
+In the mill demo, the geometry pass samples the material's refraction map
+(`p3d_Texture4`) and writes it to the Refraction Mask buffer. The refraction
+color pass reads the red channel of that buffer to decide whether to use the
+refracted UV.
 
 ## Background Colors
 
@@ -244,7 +241,9 @@ Refer back to [screen space reflection](screen-space-reflection.md#specular-map)
 </p>
 
 You'll need to render the parts of the scene behind the refractive objects.
-This can be done by hiding the refractive objects and then rendering the scene to a framebuffer texture.
+One way to do this is to hide the refractive objects when rendering the
+background. The mill demo's refraction pass reads the Base color buffer,
+where the base shader writes zero alpha for water.
 
 ### Foreground Colors
 
@@ -256,7 +255,7 @@ This can be done by hiding the refractive objects and then rendering the scene t
 // ...
 
 uniform sampler2D uvTexture;
-uniform sampler2D refractionMaskTexture;
+uniform sampler2D maskTexture;
 uniform sampler2D positionFromTexture;
 uniform sampler2D positionToTexture;
 uniform sampler2D backgroundColorTexture;
@@ -273,15 +272,15 @@ and the background colors.
 ```c
   // ...
 
-  vec3  tintColor = vec3(0.27, 0.58, 0.92, 0.3);
-  float depthMax  = 2;
+  vec4  tintColor = vec4(0.392, 0.537, 0.561, 0.8);
+  float depthMax  = 2.0;
 
   // ...
 ```
 
 `tintColor` and `depthMax` are adjustable parameters.
 `tintColor` colorizes the background color.
-`depthMax` ranges from zero to infinity.
+`depthMax` must be positive.
 When the distance between the foreground and background position reaches `depthMax`,
 the foreground color will be the fully tinted background color.
 At distance zero, the foreground will be the background color.
@@ -292,24 +291,27 @@ At distance zero, the foreground will be the background color.
   vec2 texSize  = textureSize(backgroundColorTexture, 0).xy;
   vec2 texCoord = gl_FragCoord.xy / texSize;
 
-  vec4 uv              = texture(uvTexture,              texCoord);
-  vec4 mask            = texture(maskTexture,            texCoord);
+  vec4 backgroundColor = texture(backgroundColorTexture, texCoord);
+
+  vec4 mask = texture(maskTexture, texCoord);
+  if (mask.r <= 0) { fragColor = backgroundColor; return; }
+
+  vec4 uv   = texture(uvTexture, texCoord);
+  if (uv.b   <= 0) { fragColor = backgroundColor; return; }
+
+  // ...
+
   vec4 positionFrom    = texture(positionFromTexture,    texCoord);
   vec4 positionTo      = texture(positionToTexture,      uv.xy);
-  vec4 backgroundColor = texture(backgroundColorTexture, uv.xy);
-
-  if (refractionMask.r <= 0) { fragColor = vec4(0); return; }
+       backgroundColor = texture(backgroundColorTexture, uv.xy);
 
   // ...
 ```
 
-Pull out the uv coordinates,
-mask,
-background position,
-foreground position,
-and the background color.
-
-If the refraction mask is turned off for this fragment, return nothing.
+Outside the refraction mask, return the undistorted background sampled at
+the original screen UV. Inside the mask, sample the foreground position at
+that screen UV and the background position and color at the UV stored by
+the refraction pass.
 
 ```c
   // ...
@@ -336,15 +338,16 @@ The deep color is the background color tinted with `tintColor`.
 ```c
   // ...
 
-  fragColor = mix(vec4(0), vec4(foregroundColor, 1), uv.b);
+  fragColor = mix(vec4(0.0), vec4(foregroundColor, 1.0), uv.b);
 
   // ...
 ```
 
-Recall that the blue channel, in the refracted UV texture, is set to the visibility.
-The visibility declines as the refracted ray points back at the camera.
-While the visibility should always be one, it is put here for completeness.
-As the visibility lessens, the fragment color will receive less and less of the foreground color.
+The UV pass uses ray visibility to blend the original and traced UVs:
+`mix(texCoord.xy, uv.xy, visibility)`. A miss has zero visibility, so the UV
+stays at the original screen position. The UV pass writes blue as `1`;
+it does not store the visibility there. With this buffer, the final blend
+above therefore uses the full depth-tinted color for masked fragments.
 
 ### Source
 

@@ -113,7 +113,7 @@
 </p>
 
 <p>Here you see the water refracting the light with and without normal maps. If available, be sure to use the normal mapped normals instead of the vertex normals. The smoother and flatter the surface, the harder it is to tell the light is being refracted. There will be some distortion but not enough to make it worthwhile.</p>
-<p>To use the normal maps instead, you'll need to transform the normal mapped normals from tangent space to view space just like you did in the <a href="normal-mapping.html#fragment">lighting</a> calculations. You can see this being done in <a href="https://github.com/lettier/3d-game-shaders-for-beginners/blob/master/demonstration/shaders/fragment/normal.frag" target="_blank" rel="noopener noreferrer">normal.frag</a>.</p>
+<p>To use the normal maps instead, you'll need to transform the normal mapped normals from tangent space to view space just like you did in the <a href="normal-mapping.html#fragment">lighting</a> calculations. The demo does this in <a href="https://github.com/lettier/3d-game-shaders-for-beginners/blob/master/demonstration/shaders/fragment/geometry-buffer-1.frag" target="_blank" rel="noopener noreferrer">geometry-buffer-1.frag</a>.</p>
 <h3 id="position-transformations">Position Transformations</h3>
 <p align="center">
 <img src="https://i.imgur.com/bXtXDyu.gif" alt="Position Transformations" title="Position Transformations">
@@ -141,8 +141,8 @@
 <span id="cb2-3"><a href="#cb2-3"></a>uniform vec2 rior;</span>
 <span id="cb2-4"><a href="#cb2-4"></a></span>
 <span id="cb2-5"><a href="#cb2-5"></a><span class="co">// ...</span></span></code></pre></div>
-<p>Refraction has one more adjustable parameter than reflection. <code>rior</code> is the relative index of refraction or relative refractive index. It is the ratio of the refraction indexes of two mediums. So for example, going from water to air is <code>1 / 1.33 ≈ 0.75</code>. The numerator is the refractive index of the medium the light is leaving and the denominator is the refractive index of the medium the light is entering. An <code>rior</code> of one means the light passes right through without being refracted or bent. As <code>rior</code> grows, the refraction will become a <a href="https://en.wikipedia.org/wiki/Total_internal_reflection">reflection</a>.</p>
-<p>There's no requirement that <code>rior</code> must adhere to the real world. The demo uses <code>1.05</code>. This is completely unrealistic (light does not travel faster through water than air) but the realistic setting produced too many artifacts. In the end, the distortion only has to be believable—not realistic.</p>
+<p>Refraction has one more adjustable parameter than reflection. <code>rior</code> is the relative index of refraction or relative refractive index. Divide the refractive index of the medium the ray leaves by the index of the medium it enters. Air to water is about <code>1 / 1.33 ≈ 0.75</code>; water to air is about <code>1.33 / 1 ≈ 1.33</code>. A ratio of one leaves the ray direction unchanged. When the ratio is greater than one, <a href="https://en.wikipedia.org/wiki/Total_internal_reflection">total internal reflection</a> can occur at sufficiently oblique angles. GLSL's <a href="https://registry.khronos.org/OpenGL-Refpages/gl4/html/refract.xhtml"><code>refract</code></a> returns a zero vector in that case; it does not compute a reflected ray.</p>
+<p>The demo uses <code>1.05</code> as an artistic setting to reduce screen-space artifacts.</p>
 <p align="center">
 <img src="https://i.imgur.com/dDOnobK.gif" alt="Adjusting the relative index of refraction." title="Adjusting the relative index of refraction.">
 </p>
@@ -190,13 +190,13 @@
 </p>
 
 <p>You'll need a mask to filter out the non-refractive parts of the scene. This mask will determine which fragment does and does not receive a refracted color. You could use this mask during the refracted UV calculation step or later when you actually sample the colors at the refracted UV coordinates.</p>
-<p>The mill scene uses the models' material specular as a mask. For the demo's purposes, the specular map is sufficient but you may want to use a more specialized map. Refer back to <a href="screen-space-reflection.html#specular-map">screen space reflection</a> for how to render the specular map.</p>
+<p>In the mill demo, the geometry pass samples the material's refraction map (<code>p3d_Texture4</code>) and writes it to the Refraction Mask buffer. The refraction color pass reads the red channel of that buffer to decide whether to use the refracted UV.</p>
 <h2 id="background-colors">Background Colors</h2>
 <p align="center">
 <img src="https://i.imgur.com/AmT9RrU.gif" alt="Background Colors" title="Background Colors">
 </p>
 
-<p>You'll need to render the parts of the scene behind the refractive objects. This can be done by hiding the refractive objects and then rendering the scene to a framebuffer texture.</p>
+<p>You'll need to render the parts of the scene behind the refractive objects. One way to do this is to hide the refractive objects when rendering the background. The mill demo's refraction pass reads the Base color buffer, where the base shader writes zero alpha for water.</p>
 <h3 id="foreground-colors">Foreground Colors</h3>
 <p align="center">
 <img src="https://i.imgur.com/6RPHULr.gif" alt="Foreground Colors" title="Foreground Colors">
@@ -205,7 +205,7 @@
 <div class="sourceCode" id="cb6"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb6-1"><a href="#cb6-1"></a><span class="co">// ...</span></span>
 <span id="cb6-2"><a href="#cb6-2"></a></span>
 <span id="cb6-3"><a href="#cb6-3"></a>uniform sampler2D uvTexture;</span>
-<span id="cb6-4"><a href="#cb6-4"></a>uniform sampler2D refractionMaskTexture;</span>
+<span id="cb6-4"><a href="#cb6-4"></a>uniform sampler2D maskTexture;</span>
 <span id="cb6-5"><a href="#cb6-5"></a>uniform sampler2D positionFromTexture;</span>
 <span id="cb6-6"><a href="#cb6-6"></a>uniform sampler2D positionToTexture;</span>
 <span id="cb6-7"><a href="#cb6-7"></a>uniform sampler2D backgroundColorTexture;</span>
@@ -214,27 +214,32 @@
 <p>To render the actual refractions or foreground colors, you'll need the refracted UV coordinates, refraction mask, the foreground and background vertex positions, and the background colors.</p>
 <div class="sourceCode" id="cb7"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb7-1"><a href="#cb7-1"></a>  <span class="co">// ...</span></span>
 <span id="cb7-2"><a href="#cb7-2"></a></span>
-<span id="cb7-3"><a href="#cb7-3"></a>  vec3  tintColor = vec3(<span class="fl">0.27</span>, <span class="fl">0.58</span>, <span class="fl">0.92</span>, <span class="fl">0.3</span>);</span>
-<span id="cb7-4"><a href="#cb7-4"></a>  <span class="dt">float</span> depthMax  = <span class="dv">2</span>;</span>
+<span id="cb7-3"><a href="#cb7-3"></a>  vec4  tintColor = vec4(<span class="fl">0.392</span>, <span class="fl">0.537</span>, <span class="fl">0.561</span>, <span class="fl">0.8</span>);</span>
+<span id="cb7-4"><a href="#cb7-4"></a>  <span class="dt">float</span> depthMax  = <span class="fl">2.0</span>;</span>
 <span id="cb7-5"><a href="#cb7-5"></a></span>
 <span id="cb7-6"><a href="#cb7-6"></a>  <span class="co">// ...</span></span></code></pre></div>
-<p><code>tintColor</code> and <code>depthMax</code> are adjustable parameters. <code>tintColor</code> colorizes the background color. <code>depthMax</code> ranges from zero to infinity. When the distance between the foreground and background position reaches <code>depthMax</code>, the foreground color will be the fully tinted background color. At distance zero, the foreground will be the background color.</p>
+<p><code>tintColor</code> and <code>depthMax</code> are adjustable parameters. <code>tintColor</code> colorizes the background color. <code>depthMax</code> must be positive. When the distance between the foreground and background position reaches <code>depthMax</code>, the foreground color will be the fully tinted background color. At distance zero, the foreground will be the background color.</p>
 <div class="sourceCode" id="cb8"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb8-1"><a href="#cb8-1"></a>  <span class="co">// ...</span></span>
 <span id="cb8-2"><a href="#cb8-2"></a></span>
 <span id="cb8-3"><a href="#cb8-3"></a>  vec2 texSize  = textureSize(backgroundColorTexture, <span class="dv">0</span>).xy;</span>
 <span id="cb8-4"><a href="#cb8-4"></a>  vec2 texCoord = gl_FragCoord.xy / texSize;</span>
 <span id="cb8-5"><a href="#cb8-5"></a></span>
-<span id="cb8-6"><a href="#cb8-6"></a>  vec4 uv              = texture(uvTexture,              texCoord);</span>
-<span id="cb8-7"><a href="#cb8-7"></a>  vec4 mask            = texture(maskTexture,            texCoord);</span>
-<span id="cb8-8"><a href="#cb8-8"></a>  vec4 positionFrom    = texture(positionFromTexture,    texCoord);</span>
-<span id="cb8-9"><a href="#cb8-9"></a>  vec4 positionTo      = texture(positionToTexture,      uv.xy);</span>
-<span id="cb8-10"><a href="#cb8-10"></a>  vec4 backgroundColor = texture(backgroundColorTexture, uv.xy);</span>
-<span id="cb8-11"><a href="#cb8-11"></a></span>
-<span id="cb8-12"><a href="#cb8-12"></a>  <span class="cf">if</span> (refractionMask.r &lt;= <span class="dv">0</span>) { fragColor = vec4(<span class="dv">0</span>); <span class="cf">return</span>; }</span>
+<span id="cb8-6"><a href="#cb8-6"></a>  vec4 backgroundColor = texture(backgroundColorTexture, texCoord);</span>
+<span id="cb8-7"><a href="#cb8-7"></a></span>
+<span id="cb8-8"><a href="#cb8-8"></a>  vec4 mask = texture(maskTexture, texCoord);</span>
+<span id="cb8-9"><a href="#cb8-9"></a>  <span class="cf">if</span> (mask.r &lt;= <span class="dv">0</span>) { fragColor = backgroundColor; <span class="cf">return</span>; }</span>
+<span id="cb8-10"><a href="#cb8-10"></a></span>
+<span id="cb8-11"><a href="#cb8-11"></a>  vec4 uv   = texture(uvTexture, texCoord);</span>
+<span id="cb8-12"><a href="#cb8-12"></a>  <span class="cf">if</span> (uv.b   &lt;= <span class="dv">0</span>) { fragColor = backgroundColor; <span class="cf">return</span>; }</span>
 <span id="cb8-13"><a href="#cb8-13"></a></span>
-<span id="cb8-14"><a href="#cb8-14"></a>  <span class="co">// ...</span></span></code></pre></div>
-<p>Pull out the uv coordinates, mask, background position, foreground position, and the background color.</p>
-<p>If the refraction mask is turned off for this fragment, return nothing.</p>
+<span id="cb8-14"><a href="#cb8-14"></a>  <span class="co">// ...</span></span>
+<span id="cb8-15"><a href="#cb8-15"></a></span>
+<span id="cb8-16"><a href="#cb8-16"></a>  vec4 positionFrom    = texture(positionFromTexture,    texCoord);</span>
+<span id="cb8-17"><a href="#cb8-17"></a>  vec4 positionTo      = texture(positionToTexture,      uv.xy);</span>
+<span id="cb8-18"><a href="#cb8-18"></a>       backgroundColor = texture(backgroundColorTexture, uv.xy);</span>
+<span id="cb8-19"><a href="#cb8-19"></a></span>
+<span id="cb8-20"><a href="#cb8-20"></a>  <span class="co">// ...</span></span></code></pre></div>
+<p>Outside the refraction mask, return the undistorted background sampled at the original screen UV. Inside the mask, sample the foreground position at that screen UV and the background position and color at the UV stored by the refraction pass.</p>
 <div class="sourceCode" id="cb9"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb9-1"><a href="#cb9-1"></a>  <span class="co">// ...</span></span>
 <span id="cb9-2"><a href="#cb9-2"></a></span>
 <span id="cb9-3"><a href="#cb9-3"></a>  <span class="dt">float</span> depth   = length(positionTo.xyz - positionFrom.xyz);</span>
@@ -252,10 +257,10 @@
 <p>Calculate the depth or distance between the foreground position and the background position. At zero depth, the foreground color will be the shallow color. At <code>depthMax</code>, the foreground color will be the deep color. The deep color is the background color tinted with <code>tintColor</code>.</p>
 <div class="sourceCode" id="cb10"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb10-1"><a href="#cb10-1"></a>  <span class="co">// ...</span></span>
 <span id="cb10-2"><a href="#cb10-2"></a></span>
-<span id="cb10-3"><a href="#cb10-3"></a>  fragColor = mix(vec4(<span class="dv">0</span>), vec4(foregroundColor, <span class="dv">1</span>), uv.b);</span>
+<span id="cb10-3"><a href="#cb10-3"></a>  fragColor = mix(vec4(<span class="fl">0.0</span>), vec4(foregroundColor, <span class="fl">1.0</span>), uv.b);</span>
 <span id="cb10-4"><a href="#cb10-4"></a></span>
 <span id="cb10-5"><a href="#cb10-5"></a>  <span class="co">// ...</span></span></code></pre></div>
-<p>Recall that the blue channel, in the refracted UV texture, is set to the visibility. The visibility declines as the refracted ray points back at the camera. While the visibility should always be one, it is put here for completeness. As the visibility lessens, the fragment color will receive less and less of the foreground color.</p>
+<p>The UV pass uses ray visibility to blend the original and traced UVs: <code>mix(texCoord.xy, uv.xy, visibility)</code>. A miss has zero visibility, so the UV stays at the original screen position. The UV pass writes blue as <code>1</code>; it does not store the visibility there. With this buffer, the final blend above therefore uses the full depth-tinted color for masked fragments.</p>
 <h3 id="source">Source</h3>
 <ul>
 <li><a href="https://github.com/lettier/3d-game-shaders-for-beginners/blob/master/demonstration/src/main.cxx" target="_blank" rel="noopener noreferrer">main.cxx</a></li>

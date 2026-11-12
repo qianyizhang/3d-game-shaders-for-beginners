@@ -111,14 +111,6 @@ resolution, adds, then tone maps. The LUT tiles are trilinearly sampled in the
 browser. The native demo mixes two opposite tile samples. Exact sRGB and the
 native 2.2 power curve are separate final encodings.
 
-The original [refraction lesson](../sections/screen-space-refraction.md) has two
-stale descriptions. The native [UV pass](../demonstration/shaders/fragment/screen-space-refraction.frag)
-uses visibility to mix the UV coordinates and writes blue as 1. The
-[native color pass](../demonstration/shaders/fragment/refraction.frag) returns
-undistorted background outside the mask. A future tutorial correction should
-show those two code paths in the Markdown and generated HTML. This task keeps
-the original tutorial intact.
-
 ## Inspector map
 
 | Native inspector | Browser inspector |
