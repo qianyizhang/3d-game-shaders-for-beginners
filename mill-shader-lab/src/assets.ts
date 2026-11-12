@@ -1,6 +1,6 @@
 import {
-  BufferAttribute, BufferGeometry, InterleavedBuffer, InterleavedBufferAttribute, NoColorSpace,
-  RepeatWrapping, SRGBColorSpace, TextureLoader, type Texture,
+  BufferAttribute, BufferGeometry, ClampToEdgeWrapping, InterleavedBuffer, InterleavedBufferAttribute,
+  NoColorSpace, RepeatWrapping, SRGBColorSpace, TextureLoader, type Texture, type Wrapping,
 } from "three";
 
 const ROLES = ["mill", "wheel", "water", "shutters", "vane", "banner"] as const;
@@ -70,14 +70,14 @@ export async function loadAssets(url = "/mill-assets/scene.json"): Promise<Scene
   };
   const loader = new TextureLoader();
   const textures = new Map<string, Promise<Texture>>();
-  const texture = (value: unknown, color = false) => {
+  const texture = (value: unknown, color = false, wrap: Wrapping = RepeatWrapping) => {
     const path = address(value);
-    const key = `${path}:${color}`;
+    const key = `${path}:${color}:${wrap}`;
     let promise = textures.get(key);
     if (!promise) {
       promise = loader.loadAsync(path).then(image => {
         image.colorSpace = color ? SRGBColorSpace : NoColorSpace;
-        image.wrapS = image.wrapT = RepeatWrapping;
+        image.wrapS = image.wrapT = wrap;
         return image;
       }, () => { throw new Error(`Could not load ${path}`); });
       textures.set(key, promise);
@@ -120,7 +120,9 @@ export async function loadAssets(url = "/mill-assets/scene.json"): Promise<Scene
   return {
     name: manifest.scene, meshes,
     textures: Object.fromEntries(await Promise.all(
-      keys.map(async key => [key, await texture(resources[key])] as const)
+      keys.map(async key => [
+        key, await texture(resources[key], false, key === "smoke" ? ClampToEdgeWrapping : RepeatWrapping),
+      ] as const)
     )) as SceneAssets["textures"],
     audio: [address(resources.wheelAudio), address(resources.waterAudio)],
   };

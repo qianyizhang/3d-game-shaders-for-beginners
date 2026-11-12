@@ -25,6 +25,7 @@ export const modes = {
   lighting: ["Diffuse", "Phong", "Blinn–Phong", "GGX"],
   ripples: ["Mirror", "Rippled"],
   fog: ["Off", "Legacy ramp", "Exponential"],
+  smoke: ["Off", "Sprites", "Ray-marched volume"],
   outline: ["Off", "Position edges", "Depth / normal edges"],
   filter: ["Off", "Box", "Separable Gaussian", "Kuwahara"],
   bloom: ["Off", "Legacy neighborhood", "HDR bright-pass"],

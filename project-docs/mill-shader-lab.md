@@ -20,6 +20,7 @@
 | **Across the pond** | Look across the water from a low angle. Keep a reflected object in view, then move it outside the frame to expose a screen-space miss. |
 | **Night window** | Midnight with window light on. Frame both a bright window and a dull wall in the same shot. |
 | **Near to far** | Frame near dock or wheel and farther mill or bank together. Fix camera and time; move the focus point for depth of field. |
+| **Chimney** | Frame the chimney opening and the full plume. Start at frame 60 with the clock paused. |
 | **Camera sweep** | Replay the same short pan from Overview; keep scene time fixed to isolate camera motion. |
 
 The native reference is [reset and defaults](../demonstration/src/main.cxx), with sun animation stopped (`/` if running), then midday (`1`, sun pitch 270°) or midnight (`2`, 90°). `R` resets camera, fog (2/9), foam depth (1.5), relative refraction index (1.05), and focus; it does not reset effect toggles. Preserve these values in a **Legacy** preset, translating units if the import changes scale. The close-ups above are new bookmarks, not native presets.
@@ -47,6 +48,7 @@ Use the [native capture CLI](native-reference.md#capture-the-scene-or-one-buffer
 - [x] **Screen-space reflection** · O `m` · **Across the pond.** Compare mirror-like and rippled normals, then orbit until the source leaves the frame. Inspect reflection mask, hit/visibility and color.
 - [x] **Foam and flow maps** · O `-` and `.` · **Waterline.** Change foam depth from 1.5 and see the shoreline/contact band widen. Pause and step the flow; show the direction field and moving UVs, with no change to mesh shape. Preserve the legacy flow/wheel link in Legacy mode.
 - [x] **Fog** · O `p`, `[`, `]` + F · **Near to far.** Compare the legacy near/far ramp against exponential density fog at the same camera. Inspect depth and fog amount; nearer and farther objects respond differently.
+- [x] **Chimney smoke** · Browser · **Chimney.** Compare the existing camera-facing sprites with a ray-marched density field built from the same puff positions, sizes, and ages. Hold the frame while switching A/B, orbit to see both from a new angle, and inspect Smoke mask for accumulated opacity.
 - [x] **SSAO** · O `y` · **Wall and roof.** Inspect raw and filtered occlusion at wall/roof and dock joints. Change radius or enable/disable; contact darkens without moving the light.
 - [x] **Outlines** · O `u` + F · **Wall and roof.** Compare legacy position edges against depth/normal edges. Tune a threshold; distinguish the silhouette from a crease inside it.
 - [x] **Depth of field and dilation** · O `h` and focus pick · **Near to far.** Pick the dock, then the mill. Inspect focus/blur mask, blurred source and dilated source; show the foreground bleed dilation addresses.

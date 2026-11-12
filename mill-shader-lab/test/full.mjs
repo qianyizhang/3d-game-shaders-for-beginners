@@ -136,6 +136,25 @@ await withLab(async ({ base, context }) => {
   await pair("fog");
   const fog = await view("Fog amount");
   assert.ok((await pixels(fog)).max > 60);
+  await pair("smoke");
+  assert.equal(await $("stage-title").textContent(), "Chimney");
+  const volumeMask = await view("Smoke mask");
+  await side("a");
+  const spriteMask = await shot();
+  assert.ok((await pixels(spriteMask)).max > 60 && (await pixels(volumeMask)).max > 60, "Both sides draw a plume");
+  await compare(spriteMask, volumeMask, "Sprite vs. volume opacity");
+  await choose("smoke", 1);
+  await samePixels(page, spriteMask, await shot(), "Both sides agree when they use sprites at the same frame");
+  await choose("smoke", 0);
+  assert.equal((await pixels(await shot())).max, 0, "Turning smoke off clears the mask");
+  await choose("smoke", 2);
+  await $("step").click();
+  await compare(volumeMask, await shot(), "Stepped volume");
+  await side("a");
+  await compare(spriteMask, await shot(), "Stepped sprites");
+  await $("reset").click();
+  await samePixels(page, volumeMask, await view("Smoke mask"), "Reset restores the initial volume and frame");
+
   await pair("ssao");
   const ao = await view("SSAO raw");
   const filtered = await view("SSAO filtered");
@@ -245,7 +264,7 @@ await withLab(async ({ base, context }) => {
   await narrow.locator("#reset").tap();
   assert.equal(await narrow.locator("#stage-title").textContent(), "Waterline");
   assertTouchClean();
-  console.log("All 19 live lessons, audio, capability and asset recovery, keyboard and 360 px touch passed");
+  console.log("All 20 live lessons, audio, capability and asset recovery, keyboard and 360 px touch passed");
 });
 
 async function fallbacks(context, base) {
@@ -267,6 +286,8 @@ async function fallbacks(context, base) {
   const legacy = await ui.shot();
   await ui.choose("bloom", "0");
   assert.ok((await pixelStats(sdr, legacy, await ui.shot())).count > 120, "SDR legacy bloom must render");
+  await ui.open("smoke");
+  assert.ok((await pixelStats(sdr, await ui.view("Smoke mask"))).max > 60, "SDR smoke volume must render");
   assertClean();
   await sdr.close();
 

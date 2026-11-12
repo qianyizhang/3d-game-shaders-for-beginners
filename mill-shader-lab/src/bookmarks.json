@@ -95,6 +95,14 @@
     "far": 90,
     "sun": 270
   },
+  "Chimney": {
+    "target": [0.85, 10.15, -4.55],
+    "offset": [-6, 3.1, -8],
+    "fov": 32,
+    "near": 0.2,
+    "far": 90,
+    "sun": 270
+  },
   "Camera sweep": {
     "target": [
       1.00839,

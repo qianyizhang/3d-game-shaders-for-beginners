@@ -38,7 +38,7 @@ npm test
 ```
 
 This builds the lab, starts a temporary loopback preview, and runs the
-19 lessons in headless Chrome with a disposable profile. The test blocks
+20 lessons in headless Chrome with a disposable profile. The test blocks
 off-origin app requests; it needs no internet, native SDK, or running server
 after the npm dependencies and original asset conversion are in place. It
 checks rendered pixels, shader edit recovery, audio, GPU and asset failure
@@ -84,12 +84,16 @@ The retained evidence and review index are in
   foreground stays fixed. Miss pixels match the undistorted sample.
   The live GLSL edit changes the render; a failed compile preserves it;
   reset restores the reference. Stepping pivots the wheel when linked flow runs.
-- **Full flow:** All 19 live rows have repeatable settings, real passes or
-  inputs, relevant buffer views and reset. Verified the live effects, source
-  disclosure, keyboard scene control, narrow touch drag and comparison,
-  opt-in audio, and SDR and no-WebGL states in Chrome. Compared forward
-  and deferred lighting at the same settings; average error was about 0.02
-  per channel on the 0–255 display scale.
+- **Full flow:** The lab checks exercise the live effects, buffer inspection,
+  source disclosure, reset, keyboard scene control, narrow touch drag and
+  comparison, opt-in audio, and SDR and no-WebGL states. Forward and deferred
+  lighting differed by about 0.02 per channel on the 0–255 display scale at
+  matched settings.
+- **Chimney smoke:** The browser's sprite and volume modes share one emitter
+  and scene clock. The sprites fade to transparent at their borders. The volume
+  samples procedural 3D density up to the first opaque or water surface, with a
+  uniform tint and no fluid solver or light scattering. Chrome checks compare
+  both modes and exercise stepping, reset, clearing the mask, and SDR targets.
 - **Native parity:** The 22 isolated pairs show the expected behavior where
   the algorithms overlap. Framing matches; material colors, light intensity
   and the size of a change vary. Browser-only variants (GGX, true deferred
@@ -117,7 +121,7 @@ native 2.2 power curve are separate final encodings.
 | --- | --- |
 | Positions 0, Normals 0 | Raw depth → Linear depth / View position, Encoded normals |
 | Positions 1, Normals 1 | Water depth, Water normals; water compositing compares opaque and water depth before using a sample |
-| Positions 2, Smoke Mask | Nearest opaque/water depth reconstructed by the post passes; Smoke mask for the separate sprite overlay |
+| Positions 2, Smoke Mask | Nearest opaque/water depth reconstructed by the post passes; Smoke mask shows opacity for the active sprite or volume mode |
 | Refraction Mask, Refraction UV, Refraction | Water mask, Refraction hit UV, Refracted color |
 | Reflection Mask, Reflection UV, Reflection Color, Reflection | Reflection mask, Reflection hit UV / visibility, Reflection color, Fresnel weight |
 | Reflection Blur | No separate browser blur; the reflection lesson contrasts mirror and sampled rippled normals |

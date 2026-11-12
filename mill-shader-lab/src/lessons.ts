@@ -104,6 +104,14 @@ export const lessons: readonly Lesson[] = [
     views: ["Final color", "Fog amount", "Linear depth"],
   },
   {
+    id: "smoke", group: "Water and depth", title: "Chimney smoke: sprites and volume", scene: "Chimney",
+    task: "Switch A/B with the clock paused. Orbit the chimney and compare how the outline and swirls change. Open Smoke mask to compare opacity, then step a frame to move both plumes together.",
+    comparison: "A stacks flat images that face the camera. B steps along each camera ray and accumulates smoke density through 3D space. Both use the same puff positions, sizes and ages.",
+    initial: { smoke: 2 }, reference: { smoke: 1 },
+    controls: [choose("smoke", "Smoke in B")],
+    views: ["Final color", "Smoke mask", "Linear depth"],
+  },
+  {
     id: "ssao", group: "Water and depth", title: "Screen-space ambient occlusion", scene: "Wall and roof",
     task: "Find a roof corner and a wall seam. Compare raw and filtered occlusion, then increase radius or open Waterline to see the dock joints. The sun stays fixed.",
     comparison: "A has AO off. The AO inspector still runs the diagnostic so you can inspect it before applying it.",
@@ -187,5 +195,5 @@ export const effectPanel = [
   choose("fog", "Fog"), choose("outline", "Outlines"), toggle("dof", "Depth of field"), toggle("dilation", "Dilate far colors"), toggle("motion", "Motion blur"),
   choose("filter", "Spatial filter"), choose("bloom", "Bloom"), toggle("poster", "Posterize"),
   toggle("pixel", "Pixelize"), toggle("sharpen", "Sharpen"), toggle("grain", "Grain"),
-  choose("chromatic", "Fringing"), choose("grade", "Grade"), choose("encoding", "Output encoding"), toggle("smoke", "Smoke"),
+  choose("chromatic", "Fringing"), choose("grade", "Grade"), choose("encoding", "Output encoding"), choose("smoke", "Smoke"),
 ];

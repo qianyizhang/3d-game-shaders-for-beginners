@@ -13,7 +13,7 @@ import color from "./shaders/color-effects.frag?raw";
 
 export const postBuffers = {
   "Fog amount": ["Atmosphere", "Scene color", "Opacity of the native-style near/far ramp or exponential fog."],
-  "Smoke mask": ["Smoke sprites", "Atmosphere", "Opacity of live, depth-tested smoke sampled from the original sprite."],
+  "Smoke mask": ["Atmosphere", "Inspector", "Smoke opacity after scene depth clips the plume. Black means clear; brighter means more smoke."],
   "Outline edges": ["Outline detection", "Scene color", "Position differences or depth and normal discontinuities."],
   "Focus / blur mask": ["Depth of field", "Focus composite", "Black stays sharp. White uses the blurred source."],
   "Blurred source": ["Gaussian blur", "Depth of field", "Blurred scene before dilation; watch foreground color bleed over a depth edge."],
@@ -90,8 +90,9 @@ export class Post {
       projection: u(camera.projectionMatrix), inverseProjection: u(camera.projectionMatrixInverse),
     };
     this.atmosphere = gpu.pass(atmosphere, {
-      ...depth, inputColor: u(null), smokeMap: u(assets.textures.smoke), viewMatrix: u(camera.matrixWorldInverse),
-      daylight: u(1), fogMode: u(0), fogNear: u(2), fogFar: u(9), fogDensity: u(0.18), smoke: u(false), time: u(0),
+      ...depth, inputColor: u(null), smokeMap: u(assets.textures.smoke),
+      viewMatrix: u(camera.matrixWorldInverse), inverseView: u(camera.matrixWorld),
+      daylight: u(1), fogMode: u(0), fogNear: u(2), fogFar: u(9), fogDensity: u(0.18), smokeMode: u(0), time: u(0),
     });
     this.edge = gpu.pass(edges, {
       ...depth, inputColor: u(null), opaqueNormal: u(opaqueNormal), waterNormal: u(waterNormal), mode: u(0), threshold: u(0.22),
@@ -163,7 +164,7 @@ export class Post {
       a.fogNear!.value = fx.fogNear;
       a.fogFar!.value = fx.fogFar;
       a.fogDensity!.value = fx.density;
-      a.smoke!.value = !!fx.smoke;
+      a.smokeMode!.value = fx.smoke;
       a.time!.value = state.time;
       gpu.draw(this.atmosphere, this.atmosTarget);
       input = this.atmosTarget.texture;
