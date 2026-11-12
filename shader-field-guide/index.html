@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#111820" />
+  <title>Shader Field Guide — modern GPU rendering, visually explained</title>
+  <meta name="description" content="A compact, original, illustrated rewrite of classic game shader techniques. One scene, 17 interactive techniques, concise GLSL ES 3.00 and a complete 33-chapter map." />
+  <style>
+    :root {
+      color-scheme:dark;
+      --bg:#0b1117;--surface:#111b22;--raised:#18242d;--ink:#eaf2f2;
+      --muted:#97a9b0;--faint:#647c86;--border:#283942;--teal:#8ce3ca;--amber:#e5b979;
+      --mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+      --sans:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{margin:0;background:radial-gradient(ellipse 1000px 470px at 70% -180px,#18374166,transparent),var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.53}
+    button,input{font:inherit}
+    a{color:var(--teal);text-decoration:none}a:hover{text-decoration:underline}
+    button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--teal);outline-offset:3px}
+    .shell{max-width:1580px;padding:0 30px;margin:auto}
+    .top{height:80px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);gap:20px}
+    .brand{display:flex;align-items:center;gap:13px;white-space:nowrap}
+    .logo{background:#223c3c;color:var(--teal);width:36px;height:36px;display:grid;place-items:center;border-radius:10px;font-size:20px;font-family:var(--mono);border:1px solid #42655f}
+    .brand small{font-family:var(--mono);font-size:10px;letter-spacing:.15em;color:var(--teal);display:block}
+    .brand b{font-size:18px;font-weight:650;letter-spacing:-.045em}
+    .head-links{display:flex;gap:21px;color:var(--muted);align-items:center;font-size:12px}
+    .head-links a{color:var(--muted)}
+    .head-links .source{padding:8px 12px;border:1px solid var(--border);border-radius:8px}
+    .intro{display:flex;justify-content:space-between;gap:36px;padding-top:42px;padding-bottom:31px;align-items:end}
+    .eyebrow{font-family:var(--mono);color:var(--teal);font-size:11px;letter-spacing:.13em;text-transform:uppercase}
+    .intro h1{font-size:clamp(30px,3.3vw,52px);line-height:1.12;letter-spacing:-.06em;max-width:850px;margin:13px 0}
+    .intro h1 em{font-style:normal;color:var(--teal)}
+    .intro p{color:var(--muted);max-width:735px;font-size:15px;margin:0}
+    .stats{display:flex;gap:23px;border-left:1px solid var(--border);padding-left:28px;align-items:center;white-space:nowrap}
+    .stat b{display:block;font-size:25px;line-height:1.1;font-weight:650;letter-spacing:-.04em}
+    .stat small{display:block;color:var(--faint);font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;margin-top:8px}
+    .workspace{display:grid;grid-template-columns:240px minmax(0,1.2fr) minmax(310px,.72fr);gap:18px;align-items:start;padding-bottom:60px}
+    .panel{border:1px solid var(--border);background:var(--surface);border-radius:12px;overflow:hidden}
+    .panel-top{border-bottom:1px solid var(--border);padding:16px 18px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+    .small-label{font-size:11px;letter-spacing:.13em;font-family:var(--mono);text-transform:uppercase;color:var(--muted)}
+    .panel-top .count{font-size:11px;color:var(--faint);font-family:var(--mono)}
+    .left{position:sticky;top:18px;max-height:calc(100vh - 36px);display:flex;flex-direction:column}
+    .sidebar-scroll{overflow-y:auto;scrollbar-color:#35515a transparent;min-height:0;padding:9px}
+    .group-label{font-size:10px;font-family:var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin:14px 10px 6px}
+    .lesson-button{width:100%;display:flex;align-items:center;gap:10px;border:1px solid transparent;border-radius:7px;background:none;color:#b4c2c8;text-align:left;padding:10px 9px;cursor:pointer;font-size:12px;line-height:1.3}
+    .lesson-button:hover{background:#22323b;color:var(--ink)}
+    .lesson-button.active{background:#1f3737;color:#d9fff0;border-color:#3c655f}
+    .lesson-button .index{font-family:var(--mono);font-size:10px;color:var(--faint);width:20px;flex-shrink:0}
+    .lesson-button.active .index{color:var(--teal)}
+    .sidebar-foot{padding:16px 18px;border-top:1px solid var(--border);font-size:11px;color:var(--faint)}
+    .center{min-width:0}
+    .viewer-heading{display:flex;justify-content:space-between;align-items:center;gap:10px}
+    .viewer-heading strong{font-size:14px;font-weight:600}
+    .status-dot{display:inline-block;height:7px;width:7px;background:#92d5bb;border-radius:50%;margin-right:7px;box-shadow:0 0 12px #86d6b777}
+    .stage{position:relative;overflow:hidden;background:linear-gradient(135deg,#0b1924,#253843);height:min(45vw,475px);min-height:340px;cursor:grab;touch-action:none}
+    .stage:active{cursor:grabbing}
+    .stage canvas{width:100%;height:100%;display:block;object-fit:cover}
+    .labels{position:absolute;inset:15px 16px auto;display:flex;justify-content:space-between;pointer-events:none}
+    .scene-label{font-size:10px;letter-spacing:.13em;font-family:var(--mono);padding:6px 9px;border:1px solid #ffffff20;border-radius:5px;background:#0e1723b0;color:#c6d4d8;text-transform:uppercase;max-width:45%}
+    .scene-label.after{color:#b6fff0;border-color:#8ce3ca33}
+    .split-line{position:absolute;top:0;bottom:0;left:50%;width:1px;background:#c9ffebdd;pointer-events:none;box-shadow:0 0 0 1px #0005,0 0 15px #91ffe766}
+    .split-thumb{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);height:34px;width:34px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:#d5fff0;color:#18342e;border:1px solid #b7e1d1;box-shadow:0 2px 12px #0007;font-family:var(--mono);font-size:12px;font-weight:700;pointer-events:none}
+    .error{display:none;position:absolute;inset:30px;place-content:center;text-align:center;background:#17242b;color:#efbd91;padding:15px;border-radius:8px}
+    .viewer-tools{padding:15px 19px;border-top:1px solid var(--border);display:flex;gap:15px;align-items:center}
+    .viewer-tools label{color:var(--muted);font-family:var(--mono);font-size:11px;white-space:nowrap}
+    input[type="range"]{width:100%;accent-color:#9cdcc8;cursor:pointer;height:15px}
+    .split-control{flex:1;display:flex;gap:10px;align-items:center;min-width:0}
+    .icon-button{background:#21303a;border:1px solid #344850;border-radius:6px;color:#cbdce0;padding:6px 10px;cursor:pointer;font-size:11px;white-space:nowrap}
+    .icon-button:hover{background:#29444a}
+    .render-meta{display:flex;flex-wrap:wrap;gap:8px;padding:0 18px 17px;color:var(--faint);font:10px var(--mono)}
+    .render-meta span{border:1px solid var(--border);border-radius:4px;padding:4px 7px}
+    .controls{margin-top:17px;padding:18px 19px 11px}
+    .control-heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}
+    .control-heading h3{margin:0;font-size:13px}
+    .control-heading small{font-size:11px;color:var(--faint)}
+    .slider-row{display:grid;grid-template-columns:93px 1fr 37px;gap:8px;align-items:center;margin-bottom:16px}
+    .slider-row label{color:var(--muted);font-size:12px}
+    .slider-row output{font-family:var(--mono);font-size:11px;text-align:right;color:var(--teal)}
+    .controls-note{border-top:1px solid var(--border);padding-top:11px;color:var(--faint);font-size:11px;margin-top:5px}
+    .right{position:sticky;top:18px;max-height:calc(100vh - 36px);display:flex;flex-direction:column;min-height:600px}
+    .right-scroll{overflow-y:auto;scrollbar-color:#35515a transparent}
+    .chapter{padding:22px 22px 16px}
+    .chapter-number{font-family:var(--mono);font-size:11px;color:var(--teal);letter-spacing:.13em}
+    .chapter h2{font-size:26px;font-weight:610;letter-spacing:-.045em;line-height:1.2;margin:11px 0 14px}
+    .chapter p{font-size:13px;color:#bdcdd1;line-height:1.66;margin:0}
+    .io{margin-top:21px;border-top:1px solid var(--border);padding-top:16px}
+    .io-item{margin-bottom:12px}
+    .io-item small{font:10px var(--mono);letter-spacing:.08em;color:var(--faint);display:block;margin-bottom:4px;text-transform:uppercase}
+    .io-item span{font-size:12px;color:#c9d7db}
+    .code-head{padding:13px 17px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:#14212a}
+    .code-head .small-label{color:var(--teal)}
+    .code-wrap{background:#0d171f;padding:15px 17px;overflow:auto}
+    pre{margin:0;white-space:pre;tab-size:2;color:#dbede2;font:11.3px/1.72 var(--mono)}
+    .caveat{padding:16px 20px;border-top:1px solid var(--border);color:#c4bdaf;font-size:12px;line-height:1.6;background:#1a231f}
+    .caveat strong{color:var(--amber);font-size:10px;font-family:var(--mono);letter-spacing:.11em;display:block;margin-bottom:5px}
+    .bottom{border-top:1px solid var(--border);padding:29px 0 55px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:23px}
+    .bottom h3{font-size:14px;margin:0 0 9px;font-weight:640}
+    .bottom p{font-size:12px;color:var(--muted);margin:0;line-height:1.65}
+    .bottom code{font:11px var(--mono);color:var(--teal)}
+    .footer{font-size:11px;color:var(--faint);padding-bottom:28px}
+    @media(max-width:1200px){.workspace{grid-template-columns:210px minmax(0,1fr)}.right{position:static;grid-column:2;max-height:none;min-height:0}.right-scroll{overflow:visible}.stage{height:420px}.stats{display:none}}
+    @media(max-width:760px){.shell{padding-left:15px;padding-right:15px}.top{height:65px}.head-links{gap:10px}.head-links .optional{display:none}.brand b{font-size:15px}.intro{padding:32px 0 24px}.intro h1{font-size:33px}.workspace{display:block}.left{position:static;max-height:250px;margin-bottom:15px}.right{margin-top:15px}.stage{height:350px;min-height:250px}.bottom{grid-template-columns:1fr;gap:24px}}
+  </style>
+</head>
+<body>
+  <header class="shell top">
+    <div class="brand"><span class="logo" aria-hidden="true">◈</span><div><small>GRAPHICS / FIELD NOTES</small><b>Shader Field Guide</b></div></div>
+    <nav class="head-links" aria-label="Resources">
+      <a class="optional" href="./GUIDE.md">Complete guide</a>
+      <a class="optional" href="./README.md">About this edition</a>
+      <a class="source" target="_blank" rel="noopener noreferrer" href="https://lettier.github.io/3d-game-shaders-for-beginners/index.html">Original ↗</a>
+    </nav>
+  </header>
+  <div class="shell intro">
+    <div><div class="eyebrow">A MODERN REWRITE · 2026 EDITION</div>
+      <h1>One scene. <em>Every technique</em> explained.</h1>
+      <p>A compact shader primer, rebuilt around data flow. Compare the same scene before and after an effect, inspect the fragment logic, and learn what buffers each pass actually reads.</p>
+    </div>
+    <div class="stats"><div class="stat"><b>17</b><small>LIVE LESSONS</small></div><div class="stat"><b>33</b><small>ORIGINAL SECTIONS MAPPED</small></div></div>
+  </div>
+  <main class="shell workspace">
+    <aside class="panel left" aria-label="Lesson navigation">
+      <div class="panel-top"><span class="small-label">Techniques</span><span class="count">01 — 17</span></div>
+      <div id="lessonList" class="sidebar-scroll"></div>
+      <div class="sidebar-foot">17 live effects · same geometry · GLSL ES 3.00</div>
+    </aside>
+    <section class="center" aria-label="Live shader comparison">
+      <div class="panel">
+        <div class="panel-top viewer-heading"><strong><span class="status-dot"></span>Live comparison</strong><span class="count">WEBGL2 / NO DEPENDENCIES</span></div>
+        <div class="stage" id="stage">
+          <canvas id="scene" aria-label="3D scene showing a before/after shader comparison"></canvas>
+          <div class="labels"><div class="scene-label" id="beforeLabel">BEFORE</div><div class="scene-label after" id="afterLabel">AFTER</div></div>
+          <div class="split-line" id="splitLine"><span class="split-thumb">↔</span></div>
+          <div class="error" id="error"></div>
+        </div>
+        <div class="viewer-tools">
+          <div class="split-control"><label for="split">COMPARE</label><input id="split" aria-label="Before and after divider" type="range" min="0" max="100" value="50"><span id="splitText" class="small-label">50%</span></div>
+          <button class="icon-button" id="resetCamera" title="Restore camera position">Reset view</button>
+        </div>
+        <div class="render-meta"><span id="renderMode">DETECTING GPU</span><span id="resolution">—</span><span>drag to orbit · scroll to zoom</span></div>
+      </div>
+      <div class="panel controls">
+        <div class="control-heading"><h3>Material / effect controls</h3><small>Try changing one variable</small></div>
+        <div class="slider-row"><label for="roughness">Roughness</label><input id="roughness" type="range" min="0.07" max="1" step="0.01" value="0.3"><output id="roughnessValue">0.30</output></div>
+        <div class="slider-row"><label for="metallic">Metalness</label><input id="metallic" type="range" min="0" max="1" step="0.01" value="0.11"><output id="metallicValue">0.11</output></div>
+        <div class="slider-row"><label for="effectParam" id="effectName">Bloom strength</label><input id="effectParam" type="range" min="0.2" max="3.0" step="0.05" value="1.55"><output id="effectParamValue">1.55</output></div>
+        <div class="controls-note">Material controls affect the central sphere. Effect control changes with the selected post-processing lesson. The emissive light above the cube intentionally exceeds SDR white.</div>
+      </div>
+    </section>
+    <aside class="panel right" aria-label="Lesson explanation and code">
+      <div class="panel-top"><span class="small-label">Read the pixels</span><span class="count" id="passType">GEOMETRY PASS</span></div>
+      <div class="right-scroll">
+        <section class="chapter">
+          <div class="chapter-number" id="chapterNumber">01 / SURFACE</div>
+          <h2 id="chapterTitle">Microfacet PBR</h2>
+          <p id="chapterIntro"></p>
+          <div class="io"><div class="io-item"><small>Where it runs</small><span id="stageInfo"></span></div>
+            <div class="io-item"><small>Inputs required</small><span id="dataInfo"></span></div></div>
+        </section>
+        <div class="code-head"><span class="small-label">THE CORE GLSL IDEA</span><button class="icon-button" id="copyCode">Copy</button></div>
+        <div class="code-wrap"><pre><code id="shaderCode"></code></pre></div>
+        <div class="caveat"><strong>BOUNDARY / CAVEAT</strong><span id="chapterCaveat"></span></div>
+      </div>
+    </aside>
+  </main>
+  <section class="shell bottom" aria-label="Further reading">
+    <div><h3>Learn the data flow</h3><p><code>mesh → vertex → rasterizer → fragment → color / depth / normals → post → display</code>. Each effect belongs to one part of this pipeline.</p></div>
+    <div><h3>Coverage beyond the demos</h3><p><a href="./GUIDE.md">GUIDE.md</a> maps all 33 source chapters, including deferred shading, SSAO, SSR, refraction, motion blur, DOF, water, LUTs and color-space correctness. Not all are implemented live.</p></div>
+    <div><h3>Independent implementation</h3><p>Original educational code and diagrams are not reproduced. The conceptual inspiration and the classic tutorial are credited; the live WebGL2 code and explanations here are independently written.</p></div>
+  </section>
+  <footer class="shell footer">Shader Field Guide · Independent educational rewrite of concepts covered by David Lettier's 3D Game Shaders for Beginners · Code: MIT</footer>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

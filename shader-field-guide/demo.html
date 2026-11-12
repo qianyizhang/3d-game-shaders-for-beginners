@@ -1,0 +1,1157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#111820" />
+  <title>Shader Field Guide — modern GPU rendering, visually explained</title>
+  <meta name="description" content="A compact, original, illustrated rewrite of classic game shader techniques. One scene, 17 interactive techniques, concise GLSL ES 3.00 and a complete 33-chapter map." />
+  <style>
+    :root {
+      color-scheme:dark;
+      --bg:#0b1117;--surface:#111b22;--raised:#18242d;--ink:#eaf2f2;
+      --muted:#97a9b0;--faint:#647c86;--border:#283942;--teal:#8ce3ca;--amber:#e5b979;
+      --mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+      --sans:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{margin:0;background:radial-gradient(ellipse 1000px 470px at 70% -180px,#18374166,transparent),var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.53}
+    button,input{font:inherit}
+    a{color:var(--teal);text-decoration:none}a:hover{text-decoration:underline}
+    button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--teal);outline-offset:3px}
+    .shell{max-width:1580px;padding:0 30px;margin:auto}
+    .top{height:80px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);gap:20px}
+    .brand{display:flex;align-items:center;gap:13px;white-space:nowrap}
+    .logo{background:#223c3c;color:var(--teal);width:36px;height:36px;display:grid;place-items:center;border-radius:10px;font-size:20px;font-family:var(--mono);border:1px solid #42655f}
+    .brand small{font-family:var(--mono);font-size:10px;letter-spacing:.15em;color:var(--teal);display:block}
+    .brand b{font-size:18px;font-weight:650;letter-spacing:-.045em}
+    .head-links{display:flex;gap:21px;color:var(--muted);align-items:center;font-size:12px}
+    .head-links a{color:var(--muted)}
+    .head-links .source{padding:8px 12px;border:1px solid var(--border);border-radius:8px}
+    .intro{display:flex;justify-content:space-between;gap:36px;padding-top:42px;padding-bottom:31px;align-items:end}
+    .eyebrow{font-family:var(--mono);color:var(--teal);font-size:11px;letter-spacing:.13em;text-transform:uppercase}
+    .intro h1{font-size:clamp(30px,3.3vw,52px);line-height:1.12;letter-spacing:-.06em;max-width:850px;margin:13px 0}
+    .intro h1 em{font-style:normal;color:var(--teal)}
+    .intro p{color:var(--muted);max-width:735px;font-size:15px;margin:0}
+    .stats{display:flex;gap:23px;border-left:1px solid var(--border);padding-left:28px;align-items:center;white-space:nowrap}
+    .stat b{display:block;font-size:25px;line-height:1.1;font-weight:650;letter-spacing:-.04em}
+    .stat small{display:block;color:var(--faint);font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;margin-top:8px}
+    .workspace{display:grid;grid-template-columns:240px minmax(0,1.2fr) minmax(310px,.72fr);gap:18px;align-items:start;padding-bottom:60px}
+    .panel{border:1px solid var(--border);background:var(--surface);border-radius:12px;overflow:hidden}
+    .panel-top{border-bottom:1px solid var(--border);padding:16px 18px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+    .small-label{font-size:11px;letter-spacing:.13em;font-family:var(--mono);text-transform:uppercase;color:var(--muted)}
+    .panel-top .count{font-size:11px;color:var(--faint);font-family:var(--mono)}
+    .left{position:sticky;top:18px;max-height:calc(100vh - 36px);display:flex;flex-direction:column}
+    .sidebar-scroll{overflow-y:auto;scrollbar-color:#35515a transparent;min-height:0;padding:9px}
+    .group-label{font-size:10px;font-family:var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin:14px 10px 6px}
+    .lesson-button{width:100%;display:flex;align-items:center;gap:10px;border:1px solid transparent;border-radius:7px;background:none;color:#b4c2c8;text-align:left;padding:10px 9px;cursor:pointer;font-size:12px;line-height:1.3}
+    .lesson-button:hover{background:#22323b;color:var(--ink)}
+    .lesson-button.active{background:#1f3737;color:#d9fff0;border-color:#3c655f}
+    .lesson-button .index{font-family:var(--mono);font-size:10px;color:var(--faint);width:20px;flex-shrink:0}
+    .lesson-button.active .index{color:var(--teal)}
+    .sidebar-foot{padding:16px 18px;border-top:1px solid var(--border);font-size:11px;color:var(--faint)}
+    .center{min-width:0}
+    .viewer-heading{display:flex;justify-content:space-between;align-items:center;gap:10px}
+    .viewer-heading strong{font-size:14px;font-weight:600}
+    .status-dot{display:inline-block;height:7px;width:7px;background:#92d5bb;border-radius:50%;margin-right:7px;box-shadow:0 0 12px #86d6b777}
+    .stage{position:relative;overflow:hidden;background:linear-gradient(135deg,#0b1924,#253843);height:min(45vw,475px);min-height:340px;cursor:grab;touch-action:none}
+    .stage:active{cursor:grabbing}
+    .stage canvas{width:100%;height:100%;display:block;object-fit:cover}
+    .labels{position:absolute;inset:15px 16px auto;display:flex;justify-content:space-between;pointer-events:none}
+    .scene-label{font-size:10px;letter-spacing:.13em;font-family:var(--mono);padding:6px 9px;border:1px solid #ffffff20;border-radius:5px;background:#0e1723b0;color:#c6d4d8;text-transform:uppercase;max-width:45%}
+    .scene-label.after{color:#b6fff0;border-color:#8ce3ca33}
+    .split-line{position:absolute;top:0;bottom:0;left:50%;width:1px;background:#c9ffebdd;pointer-events:none;box-shadow:0 0 0 1px #0005,0 0 15px #91ffe766}
+    .split-thumb{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);height:34px;width:34px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:#d5fff0;color:#18342e;border:1px solid #b7e1d1;box-shadow:0 2px 12px #0007;font-family:var(--mono);font-size:12px;font-weight:700;pointer-events:none}
+    .error{display:none;position:absolute;inset:30px;place-content:center;text-align:center;background:#17242b;color:#efbd91;padding:15px;border-radius:8px}
+    .viewer-tools{padding:15px 19px;border-top:1px solid var(--border);display:flex;gap:15px;align-items:center}
+    .viewer-tools label{color:var(--muted);font-family:var(--mono);font-size:11px;white-space:nowrap}
+    input[type="range"]{width:100%;accent-color:#9cdcc8;cursor:pointer;height:15px}
+    .split-control{flex:1;display:flex;gap:10px;align-items:center;min-width:0}
+    .icon-button{background:#21303a;border:1px solid #344850;border-radius:6px;color:#cbdce0;padding:6px 10px;cursor:pointer;font-size:11px;white-space:nowrap}
+    .icon-button:hover{background:#29444a}
+    .render-meta{display:flex;flex-wrap:wrap;gap:8px;padding:0 18px 17px;color:var(--faint);font:10px var(--mono)}
+    .render-meta span{border:1px solid var(--border);border-radius:4px;padding:4px 7px}
+    .controls{margin-top:17px;padding:18px 19px 11px}
+    .control-heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}
+    .control-heading h3{margin:0;font-size:13px}
+    .control-heading small{font-size:11px;color:var(--faint)}
+    .slider-row{display:grid;grid-template-columns:93px 1fr 37px;gap:8px;align-items:center;margin-bottom:16px}
+    .slider-row label{color:var(--muted);font-size:12px}
+    .slider-row output{font-family:var(--mono);font-size:11px;text-align:right;color:var(--teal)}
+    .controls-note{border-top:1px solid var(--border);padding-top:11px;color:var(--faint);font-size:11px;margin-top:5px}
+    .right{position:sticky;top:18px;max-height:calc(100vh - 36px);display:flex;flex-direction:column;min-height:600px}
+    .right-scroll{overflow-y:auto;scrollbar-color:#35515a transparent}
+    .chapter{padding:22px 22px 16px}
+    .chapter-number{font-family:var(--mono);font-size:11px;color:var(--teal);letter-spacing:.13em}
+    .chapter h2{font-size:26px;font-weight:610;letter-spacing:-.045em;line-height:1.2;margin:11px 0 14px}
+    .chapter p{font-size:13px;color:#bdcdd1;line-height:1.66;margin:0}
+    .io{margin-top:21px;border-top:1px solid var(--border);padding-top:16px}
+    .io-item{margin-bottom:12px}
+    .io-item small{font:10px var(--mono);letter-spacing:.08em;color:var(--faint);display:block;margin-bottom:4px;text-transform:uppercase}
+    .io-item span{font-size:12px;color:#c9d7db}
+    .code-head{padding:13px 17px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:#14212a}
+    .code-head .small-label{color:var(--teal)}
+    .code-wrap{background:#0d171f;padding:15px 17px;overflow:auto}
+    pre{margin:0;white-space:pre;tab-size:2;color:#dbede2;font:11.3px/1.72 var(--mono)}
+    .caveat{padding:16px 20px;border-top:1px solid var(--border);color:#c4bdaf;font-size:12px;line-height:1.6;background:#1a231f}
+    .caveat strong{color:var(--amber);font-size:10px;font-family:var(--mono);letter-spacing:.11em;display:block;margin-bottom:5px}
+    .bottom{border-top:1px solid var(--border);padding:29px 0 55px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:23px}
+    .bottom h3{font-size:14px;margin:0 0 9px;font-weight:640}
+    .bottom p{font-size:12px;color:var(--muted);margin:0;line-height:1.65}
+    .bottom code{font:11px var(--mono);color:var(--teal)}
+    .footer{font-size:11px;color:var(--faint);padding-bottom:28px}
+    @media(max-width:1200px){.workspace{grid-template-columns:210px minmax(0,1fr)}.right{position:static;grid-column:2;max-height:none;min-height:0}.right-scroll{overflow:visible}.stage{height:420px}.stats{display:none}}
+    @media(max-width:760px){.shell{padding-left:15px;padding-right:15px}.top{height:65px}.head-links{gap:10px}.head-links .optional{display:none}.brand b{font-size:15px}.intro{padding:32px 0 24px}.intro h1{font-size:33px}.workspace{display:block}.left{position:static;max-height:250px;margin-bottom:15px}.right{margin-top:15px}.stage{height:350px;min-height:250px}.bottom{grid-template-columns:1fr;gap:24px}}
+  </style>
+</head>
+<body>
+  <header class="shell top">
+    <div class="brand"><span class="logo" aria-hidden="true">◈</span><div><small>GRAPHICS / FIELD NOTES</small><b>Shader Field Guide</b></div></div>
+    <nav class="head-links" aria-label="Resources">
+      <a class="optional" href="./GUIDE.md">Complete guide</a>
+      <a class="optional" href="./README.md">About this edition</a>
+      <a class="source" target="_blank" rel="noopener noreferrer" href="https://lettier.github.io/3d-game-shaders-for-beginners/index.html">Original ↗</a>
+    </nav>
+  </header>
+  <div class="shell intro">
+    <div><div class="eyebrow">A MODERN REWRITE · 2026 EDITION</div>
+      <h1>One scene. <em>Every technique</em> explained.</h1>
+      <p>A compact shader primer, rebuilt around data flow. Compare the same scene before and after an effect, inspect the fragment logic, and learn what buffers each pass actually reads.</p>
+    </div>
+    <div class="stats"><div class="stat"><b>17</b><small>LIVE LESSONS</small></div><div class="stat"><b>33</b><small>ORIGINAL SECTIONS MAPPED</small></div></div>
+  </div>
+  <main class="shell workspace">
+    <aside class="panel left" aria-label="Lesson navigation">
+      <div class="panel-top"><span class="small-label">Techniques</span><span class="count">01 — 17</span></div>
+      <div id="lessonList" class="sidebar-scroll"></div>
+      <div class="sidebar-foot">17 live effects · same geometry · GLSL ES 3.00</div>
+    </aside>
+    <section class="center" aria-label="Live shader comparison">
+      <div class="panel">
+        <div class="panel-top viewer-heading"><strong><span class="status-dot"></span>Live comparison</strong><span class="count">WEBGL2 / NO DEPENDENCIES</span></div>
+        <div class="stage" id="stage">
+          <canvas id="scene" aria-label="3D scene showing a before/after shader comparison"></canvas>
+          <div class="labels"><div class="scene-label" id="beforeLabel">BEFORE</div><div class="scene-label after" id="afterLabel">AFTER</div></div>
+          <div class="split-line" id="splitLine"><span class="split-thumb">↔</span></div>
+          <div class="error" id="error"></div>
+        </div>
+        <div class="viewer-tools">
+          <div class="split-control"><label for="split">COMPARE</label><input id="split" aria-label="Before and after divider" type="range" min="0" max="100" value="50"><span id="splitText" class="small-label">50%</span></div>
+          <button class="icon-button" id="resetCamera" title="Restore camera position">Reset view</button>
+        </div>
+        <div class="render-meta"><span id="renderMode">DETECTING GPU</span><span id="resolution">—</span><span>drag to orbit · scroll to zoom</span></div>
+      </div>
+      <div class="panel controls">
+        <div class="control-heading"><h3>Material / effect controls</h3><small>Try changing one variable</small></div>
+        <div class="slider-row"><label for="roughness">Roughness</label><input id="roughness" type="range" min="0.07" max="1" step="0.01" value="0.3"><output id="roughnessValue">0.30</output></div>
+        <div class="slider-row"><label for="metallic">Metalness</label><input id="metallic" type="range" min="0" max="1" step="0.01" value="0.11"><output id="metallicValue">0.11</output></div>
+        <div class="slider-row"><label for="effectParam" id="effectName">Bloom strength</label><input id="effectParam" type="range" min="0.2" max="3.0" step="0.05" value="1.55"><output id="effectParamValue">1.55</output></div>
+        <div class="controls-note">Material controls affect the central sphere. Effect control changes with the selected post-processing lesson. The emissive light above the cube intentionally exceeds SDR white.</div>
+      </div>
+    </section>
+    <aside class="panel right" aria-label="Lesson explanation and code">
+      <div class="panel-top"><span class="small-label">Read the pixels</span><span class="count" id="passType">GEOMETRY PASS</span></div>
+      <div class="right-scroll">
+        <section class="chapter">
+          <div class="chapter-number" id="chapterNumber">01 / SURFACE</div>
+          <h2 id="chapterTitle">Microfacet PBR</h2>
+          <p id="chapterIntro"></p>
+          <div class="io"><div class="io-item"><small>Where it runs</small><span id="stageInfo"></span></div>
+            <div class="io-item"><small>Inputs required</small><span id="dataInfo"></span></div></div>
+        </section>
+        <div class="code-head"><span class="small-label">THE CORE GLSL IDEA</span><button class="icon-button" id="copyCode">Copy</button></div>
+        <div class="code-wrap"><pre><code id="shaderCode"></code></pre></div>
+        <div class="caveat"><strong>BOUNDARY / CAVEAT</strong><span id="chapterCaveat"></span></div>
+      </div>
+    </aside>
+  </main>
+  <section class="shell bottom" aria-label="Further reading">
+    <div><h3>Learn the data flow</h3><p><code>mesh → vertex → rasterizer → fragment → color / depth / normals → post → display</code>. Each effect belongs to one part of this pipeline.</p></div>
+    <div><h3>Coverage beyond the demos</h3><p><a href="./GUIDE.md">GUIDE.md</a> maps all 33 source chapters, including deferred shading, SSAO, SSR, refraction, motion blur, DOF, water, LUTs and color-space correctness. Not all are implemented live.</p></div>
+    <div><h3>Independent implementation</h3><p>Original educational code and diagrams are not reproduced. The conceptual inspiration and the classic tutorial are credited; the live WebGL2 code and explanations here are independently written.</p></div>
+  </section>
+  <footer class="shell footer">Shader Field Guide · Independent educational rewrite of concepts covered by David Lettier's 3D Game Shaders for Beginners · Code: MIT</footer>
+  <script>
+
+/* -------- src/lessons.js -------- */
+/** Small, inspectable lessons. Shader fragments are illustrative, not pasted from the source tutorial. */
+const LESSONS = [
+  {
+    id: 'pbr', group: 'SURFACE', title: 'Microfacet PBR', number: '01',
+    baseline: 'Lambert diffuse', after: 'GGX microfacet BRDF',
+    shader: 0, beforeShader: 1, post: 0, data: 'world position · normal · base color · roughness · metalness',
+    stage: 'Fragment · geometry pass',
+    intuition: 'A material is not just a highlight exponent. Roughness controls the distribution of microscopic surface normals; metalness changes how light splits between diffuse and specular reflection.',
+    snippet: `vec3 H  = normalize(L + V);\nfloat a = max(0.035, roughness * roughness);\nfloat D = D_GGX(max(dot(N, H), 0.0), a);\nvec3 F = F_Schlick(max(dot(V, H), 0.0), F0);\nfloat G = G_Schlick(NoL, roughness) * G_Schlick(NoV, roughness);\nvec3 specular = D * G * F / max(4.0 * NoL * NoV, 1e-4);`,
+    caveat: 'The live demo implements direct lights and a minimal ambient approximation, not a complete image-based-lighting (IBL) renderer.'
+  },
+  {
+    id: 'blinn', group: 'SURFACE', title: 'Blinn–Phong', number: '02',
+    baseline: 'Lambert diffuse', after: 'Half-vector specular',
+    shader: 2, beforeShader: 1, post: 0, data: 'normal · light direction · view direction', stage: 'Fragment · geometry pass',
+    intuition: 'The halfway direction H = normalize(L + V) is the direction between the view and light. Its alignment with the surface normal determines a stylized specular highlight.',
+    snippet: `vec3 H = normalize(L + V);\nfloat diffuse = max(dot(N, L), 0.0);\nfloat specular = pow(max(dot(N, H), 0.0), 64.0);\nvec3 lit = baseColor * diffuse + vec3(specular);`,
+    caveat: 'Useful for learning or art-directed materials, but its shininess parameter is not equivalent to physical roughness.'
+  },
+  {
+    id: 'normals', group: 'SURFACE', title: 'Normal buffer', number: '03',
+    baseline: 'Lit surface', after: 'Encoded normals',
+    shader: 0, beforeShader: 0, post: 10, data: 'interpolated normal · render target', stage: 'Geometry pass → debug composite',
+    intuition: 'Normals are directional data. Every visible triangle contributes a normal, interpolated across fragments. Encoding N × 0.5 + 0.5 makes the −1…1 vector inspectable as RGB.',
+    snippet: `// Geometry fragment output, attached to an FBO:\nlayout(location = 1) out vec4 normalBuffer;\nnormalBuffer = vec4(normalize(worldNormal) * 0.5 + 0.5, 1.0);\n// Later: N = texture(normalBuffer, uv).rgb * 2.0 - 1.0;`,
+    caveat: 'This demo stores world-space normals. Any effect combining normals and positions must use compatible coordinate spaces.'
+  },
+  {
+    id: 'depth', group: 'BUFFERS', title: 'Depth reconstruction', number: '04',
+    baseline: 'Lit surface', after: 'Linearized camera depth',
+    shader: 0, beforeShader: 0, post: 11, data: 'hardware depth texture · near/far planes', stage: 'Geometry pass → post-processing',
+    intuition: 'The depth buffer is non-linear. For effects that depend on meters or distances, first reconstruct linear camera depth or a view-space position.',
+    snippet: `float linearDepth(float d, float near, float far) {\n  float z = d * 2.0 - 1.0; // OpenGL/WebGL NDC\n  return 2.0 * near * far /\n         (far + near - z * (far - near));\n}`,
+    caveat: 'This formula assumes conventional OpenGL depth and a perspective projection. Reversed-Z and WebGPU depth conventions require different handling.'
+  },
+  {
+    id: 'detail', group: 'SURFACE', title: 'Normal detail', number: '05',
+    baseline: 'Smooth normals', after: 'Perturbed normals',
+    shader: 6, beforeShader: 0, post: 0, data: 'UV · normal · tangent/bitangent basis', stage: 'Fragment · geometry pass',
+    intuition: 'Changing a fragment normal changes lighting without changing the silhouette. A normal map stores tangent-space directions, which are transformed back to world/view space by a TBN basis.',
+    snippet: `vec3 tangentN = texture(normalMap, uv).xyz * 2.0 - 1.0;\nmat3 TBN = mat3(T, B, N); // orthonormal world-space basis\nvec3 worldN = normalize(TBN * tangentN);`,
+    caveat: 'For zero assets, the live sphere generates a procedural normal perturbation. It demonstrates the effect but is not a baked tangent-space normal texture.'
+  },
+  {
+    id: 'toon', group: 'STYLIZE', title: 'Cel shading', number: '06',
+    baseline: 'Continuous lighting', after: 'Quantized light bands',
+    shader: 3, beforeShader: 0, post: 0, data: 'surface normal · light direction', stage: 'Fragment · geometry pass',
+    intuition: 'Cel shading does not require a fundamentally different geometry pipeline. Discretize a smooth lighting function into a few flat levels.',
+    snippet: `float NoL = max(dot(N, L), 0.0);\nfloat band = NoL > 0.72 ? 1.0 :\n             NoL > 0.32 ? 0.62 : 0.24;\nvec3 color = baseColor * band;`,
+    caveat: 'A light ramp texture makes band placement artist-editable. Add a depth/normal outline for a stronger cartoon look.'
+  },
+  {
+    id: 'rim', group: 'STYLIZE', title: 'Rim lighting', number: '07',
+    baseline: 'Lit surface', after: 'Grazing-angle rim',
+    shader: 4, beforeShader: 0, post: 0, data: 'surface normal · view direction', stage: 'Fragment · geometry pass',
+    intuition: 'At grazing view angles, dot(N, V) approaches zero. That yields a controllable band near silhouettes, useful for stylization and selection affordances.',
+    snippet: `float facing = max(dot(N, V), 0.0);\nfloat rim = pow(1.0 - facing, 3.0);\ncolor += rim * vec3(0.20, 0.65, 1.0);`,
+    caveat: 'A rim-light term is art-directed emission. It is not a substitute for the Fresnel term in an energy-aware PBR BRDF.'
+  },
+  {
+    id: 'fog', group: 'SPACE', title: 'Depth fog', number: '08',
+    baseline: 'Clear atmosphere', after: 'Exponential fog',
+    shader: 0, beforeShader: 0, post: 1, data: 'scene color · depth · fog density', stage: 'Full-screen post pass',
+    intuition: 'Distance-dependent transmission attenuates scene radiance. In the simplest homogeneous fog model, transmittance falls off exponentially with travel distance.',
+    snippet: `float viewZ = linearDepth(texture(depth, uv).r, near, far);\nfloat transmission = exp(-density * viewZ);\nvec3 fogged = mix(fogColor, sceneColor, transmission);`,
+    caveat: 'This is constant-density distance fog. Height fog and volumetric scattering need integration along the camera ray and shadowing information.'
+  },
+  {
+    id: 'outline', group: 'SPACE', title: 'Depth/normal outlines', number: '09',
+    baseline: 'Smooth raster output', after: 'Detected discontinuities',
+    shader: 0, beforeShader: 0, post: 2, data: 'linear depth · normal buffer · neighbor samples', stage: 'Full-screen post pass',
+    intuition: 'An outline is an image-space discontinuity. Compare depth and normal values to nearby pixels; a sufficiently large change indicates an object boundary or crease.',
+    snippet: `vec2 px = 1.0 / vec2(textureSize(normalTex, 0));\nvec3 n0 = texture(normalTex, uv).xyz * 2.0 - 1.0;\nvec3 nx = texture(normalTex, uv + vec2(px.x, 0)).xyz * 2.0 - 1.0;\nfloat edge = smoothstep(0.15, 0.50, length(nx - n0));`,
+    caveat: 'Screen-space outlines cannot recover hidden lines. Tune depth thresholds with distance to avoid excessive outlines on far geometry.'
+  },
+  {
+    id: 'bloom', group: 'POST', title: 'HDR bloom', number: '10',
+    baseline: 'Tonemapped scene', after: 'Bright-pass + blur + combine',
+    shader: 0, beforeShader: 0, post: 3, data: 'linear HDR scene color · half-resolution blur', stage: '3 post passes + output transform',
+    intuition: 'Light sources can exceed display white. Extract this HDR excess, blur it cheaply at reduced resolution, then add it back before tone mapping.',
+    snippet: `vec3 bright = max(hdrColor - vec3(1.0), 0.0);\n// Downsample and blur bright into a smaller target.\nvec3 combined = hdrColor + blurredBright * bloomStrength;\nvec3 displayLinear = toneMap(combined);\nvec3 displaySRGB = linearToSRGB(displayLinear);`,
+    caveat: 'This live example uses one half-resolution, separable Gaussian level. Production bloom commonly uses several mip levels and more careful energy calibration.'
+  },
+  {
+    id: 'blur', group: 'POST', title: 'Spatial blur', number: '11',
+    baseline: 'Original scene', after: 'Gaussian-weighted neighbors',
+    shader: 0, beforeShader: 0, post: 4, data: 'scene color · texel size · sampling kernel', stage: 'Full-screen post pass',
+    intuition: 'A blur is a weighted average of neighboring pixels. Gaussian blur prioritizes close neighbors; a separable implementation turns a 2D kernel into horizontal and vertical 1D passes.',
+    snippet: `float w[4] = float[4](0.1945946, 0.1216216, 0.054054, 0.016216);\nvec3 result = texture(inputTex, uv).rgb * 0.227027;\nfor (int i = 1; i <= 4; ++i) {\n  vec2 d = direction * texelSize * float(i);\n  result += w[i-1] * (texture(inputTex, uv + d).rgb\n                      + texture(inputTex, uv - d).rgb);\n}`,
+    caveat: 'The full-screen comparison uses a compact 9-tap 2D kernel. The bloom path demonstrates a true two-pass separable blur.'
+  },
+  {
+    id: 'poster', group: 'STYLIZE', title: 'Posterization', number: '12',
+    baseline: 'Continuous tones', after: 'Discrete color levels',
+    shader: 0, beforeShader: 0, post: 5, data: 'tonemapped scene color', stage: 'Output / color-grading pass',
+    intuition: 'Reduce continuous color values to a small fixed palette. Quantizing channels independently is the minimal version; palette mapping and luminance-preserving quantization can look better.',
+    snippet: `float levels = 6.0;\nvec3 quantized = floor(color * levels + 0.5) / levels;`,
+    caveat: 'Quantization can visibly band smooth gradients. Dithering trades small amounts of structured noise for reduced banding.'
+  },
+  {
+    id: 'pixel', group: 'STYLIZE', title: 'Pixelation', number: '13',
+    baseline: 'Native resolution', after: 'Block-sampled scene',
+    shader: 0, beforeShader: 0, post: 6, data: 'scene color · framebuffer resolution', stage: 'Full-screen post pass',
+    intuition: 'Map every block of screen pixels to one representative sample. Doing this at the UV lookup stage gives a pixellated image without changing scene geometry.',
+    snippet: `vec2 size = vec2(textureSize(sceneTex, 0));\nvec2 cell = vec2(9.0);\nvec2 center = (floor(uv * size / cell) + 0.5) * cell;\nvec3 color = texture(sceneTex, center / size).rgb;`,
+    caveat: 'For authentic pixel-art presentation, render the scene at a genuinely lower resolution and upscale with nearest-neighbor filtering.'
+  },
+  {
+    id: 'grade', group: 'POST', title: 'Color grading', number: '14',
+    baseline: 'Neutral output', after: 'Warm shadows / cool highlights',
+    shader: 0, beforeShader: 0, post: 7, data: 'scene color · tone-mapping stage', stage: 'Output / color-grading pass',
+    intuition: 'Color grading remaps image appearance after lighting. A 3D LUT is the scalable general solution; here a compact split-tone transform makes the idea visible.',
+    snippet: `float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));\nvec3 shadows = vec3(1.07, 0.95, 0.83);\nvec3 highs   = vec3(0.89, 1.03, 1.12);\ncolor *= mix(shadows, highs, smoothstep(0.1, 0.9, luma));`,
+    caveat: 'This is split toning, not a real 3D LUT. For production, sample a calibrated 3D LUT in a specified working color space.'
+  },
+  {
+    id: 'grain', group: 'POST', title: 'Film grain', number: '15',
+    baseline: 'Clean output', after: 'Subtle stochastic grain',
+    shader: 0, beforeShader: 0, post: 8, data: 'screen pixel coordinates · frame index', stage: 'Final display pass',
+    intuition: 'A small noise field adds texture to broad smooth gradients. A stable pixel hash avoids the patterned artifacts of naïve sin(dot(...)) noise.',
+    snippet: `uint hash(uint x) {\n  x ^= x >> 16; x *= 0x7feb352du;\n  x ^= x >> 15; x *= 0x846ca68bu;\n  return x ^ (x >> 16);\n}\nfloat noise = float(hash(pixelId)) / 4294967295.0 - 0.5;`,
+    caveat: 'Film grain can interfere with temporal accumulation and compression. Apply it late, after TAA/upscaling, when available.'
+  },
+  {
+    id: 'chromatic', group: 'POST', title: 'Chromatic aberration', number: '16',
+    baseline: 'Aligned RGB', after: 'Separated channel sampling',
+    shader: 0, beforeShader: 0, post: 9, data: 'scene color · per-channel UV offset', stage: 'Full-screen post pass',
+    intuition: 'Sample red and blue at slightly different UV coordinates, increasing offset away from the image center. The result resembles lens color fringing.',
+    snippet: `vec2 delta = uv - 0.5;\nvec2 shift = delta * 0.012;\nvec3 color = vec3(\n  texture(sceneTex, uv + shift).r,\n  texture(sceneTex, uv).g,\n  texture(sceneTex, uv - shift).b\n);`,
+    caveat: 'Usually best kept very subtle; overuse reduces legibility and causes unwanted fringing around UI.'
+  },
+  {
+    id: 'sharpen', group: 'POST', title: 'Sharpen', number: '17',
+    baseline: 'Unmodified image', after: 'Five-tap Laplacian',
+    shader: 0, beforeShader: 0, post: 12, data: 'scene color · pixel neighbors', stage: 'Full-screen post pass',
+    intuition: 'Sharpening boosts local contrast. A small Laplacian kernel subtracts neighbors from the center sample; too much creates ringing and amplifies aliasing.',
+    snippet: `vec2 p = 1.0 / vec2(textureSize(sceneTex, 0));\nvec3 c = texture(sceneTex, uv).rgb;\nvec3 n = texture(sceneTex, uv + vec2(p.x,0)).rgb\n       + texture(sceneTex, uv - vec2(p.x,0)).rgb\n       + texture(sceneTex, uv + vec2(0,p.y)).rgb\n       + texture(sceneTex, uv - vec2(0,p.y)).rgb;\nvec3 sharp = c * (1.0 + 4.0*amount) - n*amount;`,
+    caveat: 'Avoid sharpening before anti-aliasing/upscaling. Temporal-aware or contrast-adaptive sharpeners are often preferable.'
+  }
+];
+
+const GROUPS = [
+  { key: 'SURFACE', label: 'Surface & lighting', summary: 'Geometry and material evaluation' },
+  { key: 'BUFFERS', label: 'Data & framebuffers', summary: 'What every screen-space effect reads' },
+  { key: 'SPACE', label: 'Depth & structure', summary: 'Working with scene buffers' },
+  { key: 'POST', label: 'Compositing & color', summary: 'Full-screen image operations' },
+  { key: 'STYLIZE', label: 'Non-photorealistic', summary: 'Deliberately non-physical looks' },
+];
+
+
+/* -------- src/renderer.js -------- */
+/**
+ * Dependency-free WebGL2 field-guide renderer.
+ * Two geometry passes (reference / effect) → optional HDR bright pass → separable blur
+ * → final compare + tone map + sRGB output. The same meshes are reused for every lesson.
+ *
+ * Deliberately educational: no shadow maps, no IBL, no TAA, no SSR ray marcher.
+ */
+const PI = Math.PI;
+const NEAR = 0.1;
+const FAR = 36.0;
+
+const geometryVS = `#version 300 es
+precision highp float;
+layout(location=0) in vec3 a_position;
+layout(location=1) in vec3 a_normal;
+layout(location=2) in vec2 a_uv;
+uniform mat4 u_model;
+uniform mat4 u_view;
+uniform mat4 u_projection;
+out vec3 v_worldPosition;
+out vec3 v_worldNormal;
+out vec2 v_uv;
+void main() {
+  vec4 p = u_model * vec4(a_position, 1.0);
+  v_worldPosition = p.xyz;
+  v_worldNormal = normalize(mat3(u_model) * a_normal);
+  v_uv = a_uv;
+  gl_Position = u_projection * u_view * p;
+}`;
+
+const geometryFS = `#version 300 es
+precision highp float;
+in vec3 v_worldPosition;
+in vec3 v_worldNormal;
+in vec2 v_uv;
+layout(location=0) out vec4 outScene;
+layout(location=1) out vec4 outNormal;
+uniform vec3 u_camera;
+uniform vec3 u_baseColor; // linear sRGB
+uniform float u_roughness;
+uniform float u_metallic;
+uniform int u_material;
+uniform int u_shading;
+uniform float u_time;
+const float PI = 3.14159265359;
+
+float D_GGX(float NoH, float alpha) {
+  float a2 = alpha * alpha;
+  float d = NoH * NoH * (a2 - 1.0) + 1.0;
+  return a2 / max(PI * d * d, 1e-5);
+}
+float G_Schlick(float NoX, float rough) {
+  float k = pow(rough + 1.0, 2.0) / 8.0;
+  return NoX / (NoX * (1.0 - k) + k);
+}
+vec3 F_Schlick(float cosTheta, vec3 F0) {
+  return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
+}
+vec3 lightContribution(vec3 N, vec3 V, vec3 L, vec3 radiance,
+                       vec3 albedo, float rough, float metal) {
+  vec3 H = normalize(V + L);
+  float NoL = max(dot(N, L), 0.0);
+  float NoV = max(dot(N, V), 0.0);
+  float NoH = max(dot(N, H), 0.0);
+  float VoH = max(dot(V, H), 0.0);
+  vec3 F0 = mix(vec3(0.04), albedo, metal);
+  vec3 F = F_Schlick(VoH, F0);
+  float a = max(0.035, rough * rough);
+  float D = D_GGX(NoH, a);
+  float G = G_Schlick(NoL, rough) * G_Schlick(NoV, rough);
+  vec3 specular = D * G * F / max(4.0 * NoL * NoV, 1e-4);
+  vec3 diffuse = (1.0 - F) * (1.0 - metal) * albedo / PI;
+  return (diffuse + specular) * radiance * NoL;
+}
+
+void main() {
+  vec3 N = normalize(v_worldNormal);
+  vec3 V = normalize(u_camera - v_worldPosition);
+  vec3 base = u_baseColor;
+  float rough = u_roughness;
+  float metal = u_metallic;
+
+  if (u_material == 2) { // floor: subtle tiled pigment + contact darkening
+    vec2 f = abs(fract(v_worldPosition.xz * 0.60) - 0.5);
+    float grout = smoothstep(0.47, 0.495, max(f.x, f.y));
+    base *= 1.0 - 0.20 * grout;
+    float dist2 = dot(v_worldPosition.xz, v_worldPosition.xz);
+    base *= 1.0 - 0.19 * exp(-dist2 * 0.75);
+  }
+  if (u_material == 1) { // torus
+    base *= vec3(1.0, 0.97, 0.85);
+  }
+  if (u_material == 3) { // small emissive specimen: values exceed SDR white
+    outScene = vec4(base * 5.0, 1.0);
+    outNormal = vec4(N * 0.5 + 0.5, 1.0);
+    return;
+  }
+  if (u_shading == 6 && u_material == 0) {
+    // Procedural, asset-free analogue of normal mapping (not a sampled map).
+    float x = sin(v_uv.x * 92.0) * cos(v_uv.y * 52.0);
+    float y = cos(v_uv.x * 68.0 + v_uv.y * 37.0);
+    vec3 T = normalize(cross(abs(N.y) < 0.90 ? vec3(0,1,0) : vec3(1,0,0), N));
+    vec3 B = normalize(cross(N, T));
+    N = normalize(N + T * (0.23 * x) + B * (0.17 * y));
+  }
+  outNormal = vec4(N * 0.5 + 0.5, 1.0);
+  if (u_shading == 5) { outScene = vec4(base, 1.0); return; }
+
+  vec3 L = normalize(vec3(-0.58, 0.82, 0.70));
+  vec3 L2 = normalize(vec3(0.70, 0.42, -0.38));
+  float NoL = max(dot(N, L), 0.0);
+  vec3 color;
+  if (u_shading == 1) { // pure Lambert for comparison
+    color = base * (0.13 + 1.9 * NoL);
+  } else if (u_shading == 2) { // Blinn-Phong (not physical roughness)
+    vec3 H = normalize(L + V);
+    float shininess = mix(110.0, 8.0, rough);
+    color = base * (0.13 + 1.8 * NoL)
+          + vec3(2.2) * pow(max(dot(N, H), 0.0), shininess) * NoL;
+  } else if (u_shading == 3) { // toon bands
+    float band = NoL > 0.72 ? 1.4 : NoL > 0.30 ? 0.80 : 0.27;
+    color = base * band + vec3(0.02, 0.024, 0.035);
+  } else {
+    // Educational PBR direct illumination + deliberately approximate ambient.
+    color = lightContribution(N, V, L, vec3(5.1, 4.5, 4.0), base, rough, metal);
+    color += lightContribution(N, V, L2, vec3(0.56, 0.89, 1.8), base, rough, metal);
+    color += base * (1.0 - metal) * (0.085 + 0.11 * max(N.y, 0.0));
+    color += mix(vec3(0.03), base, metal) * 0.09;
+    if (u_shading == 4) { // explicitly artistic rim, not physical Fresnel
+      float rim = pow(1.0 - max(dot(N, V), 0.0), 3.0);
+      color += rim * vec3(0.35, 1.15, 1.8);
+    }
+  }
+  outScene = vec4(color, 1.0);
+}`;
+
+const fullscreenVS = `#version 300 es
+precision highp float;
+out vec2 v_uv;
+void main() {
+  vec2 p = vec2(gl_VertexID == 1 ? 3.0 : -1.0,
+                gl_VertexID == 2 ? 3.0 : -1.0);
+  v_uv = p * 0.5 + 0.5;
+  gl_Position = vec4(p, 0.0, 1.0);
+}`;
+
+const brightFS = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+layout(location=0) out vec4 outColor;
+uniform sampler2D u_input;
+void main() {
+  vec3 c = texture(u_input, v_uv).rgb;
+  outColor = vec4(max(c - vec3(1.15), 0.0), 1.0);
+}`;
+
+const blurFS = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+layout(location=0) out vec4 outColor;
+uniform sampler2D u_input;
+uniform vec2 u_step;
+void main() {
+  vec3 c = texture(u_input, v_uv).rgb * 0.227027;
+  float w[4] = float[4](0.1945946, 0.1216216, 0.0540540, 0.0162160);
+  for (int i = 1; i <= 4; ++i) {
+    vec2 d = u_step * float(i);
+    c += w[i-1] * (texture(u_input, v_uv+d).rgb + texture(u_input, v_uv-d).rgb);
+  }
+  outColor = vec4(c, 1.0);
+}`;
+
+const compositeFS = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+layout(location=0) out vec4 outColor;
+uniform sampler2D u_before;
+uniform sampler2D u_after;
+uniform sampler2D u_normals;
+uniform sampler2D u_depth;
+uniform sampler2D u_bloom;
+uniform float u_split;
+uniform int u_post;
+uniform float u_time;
+uniform vec2 u_resolution;
+uniform float u_fogDensity;
+uniform float u_bloomStrength;
+uniform float u_hdr;
+const float NEAR=0.1;
+const float FAR=36.0;
+float linearDepth(float d) {
+  float z = d * 2.0 - 1.0;
+  return (2.0 * NEAR * FAR) / (FAR + NEAR - z * (FAR - NEAR));
+}
+vec3 srgbEncode(vec3 x) {
+  x = max(x, 0.0);
+  vec3 a = 1.055 * pow(x, vec3(1.0/2.4)) - 0.055;
+  vec3 b = 12.92 * x;
+  return vec3(x.r <= 0.0031308 ? b.r : a.r,
+              x.g <= 0.0031308 ? b.g : a.g,
+              x.b <= 0.0031308 ? b.b : a.b);
+}
+vec3 toneMap(vec3 x) {
+  return clamp(x * (2.51*x + 0.03) / (x*(2.43*x + 0.59) + 0.14), 0.0, 1.0);
+}
+uint hash32(uint x) {
+  x ^= x >> 16; x *= 0x7feb352du;
+  x ^= x >> 15; x *= 0x846ca68bu;
+  return x ^ (x >> 16);
+}
+vec3 neighbor(vec2 uv) { return texture(u_after, clamp(uv, 0.0, 1.0)).rgb; }
+float outlineAmount(vec2 uv) {
+  vec2 t = 1.0 / u_resolution;
+  float d0 = texture(u_depth, uv).r;
+  vec3 n0 = texture(u_normals, uv).xyz * 2.0 - 1.0;
+  float depthEdge = 0.0, normalEdge = 0.0;
+  for (int i=0; i<4; ++i) {
+    vec2 stepUV = (i == 0 ? vec2(t.x,0) : i == 1 ? vec2(-t.x,0) :
+                   i == 2 ? vec2(0,t.y) : vec2(0,-t.y));
+    vec2 q = clamp(uv + stepUV * 1.3, 0.0, 1.0);
+    float di = texture(u_depth, q).r;
+    vec3 ni = texture(u_normals, q).xyz * 2.0 - 1.0;
+    // Linear depth, ratio-scaled to behave across distance.
+    float linear0=linearDepth(d0), linear1=linearDepth(di);
+    depthEdge=max(depthEdge, abs(linear0-linear1) / max(0.8, linear0));
+    normalEdge=max(normalEdge, length(ni-n0));
+  }
+  return clamp(smoothstep(0.018,0.055,depthEdge)
+             + smoothstep(0.19,0.50,normalEdge), 0.0, 1.0);
+}
+void main() {
+  bool before = v_uv.x < u_split;
+  vec2 uv = v_uv;
+  if (!before && u_post == 6) {
+    vec2 size = u_resolution;
+    uv = (floor(uv*size/vec2(10.0)) + 0.5) * 10.0 / size;
+  }
+  vec3 c = before ? texture(u_before,uv).rgb : texture(u_after,uv).rgb;
+  // Debug data is not photometric color. Display encoded values directly.
+  if (!before && u_post == 10) {
+    outColor=vec4(texture(u_normals,v_uv).rgb,1.0); return;
+  }
+  if (!before && u_post == 11) {
+    float d=texture(u_depth,v_uv).r;
+    float gray = d > 0.99999 ? 0.02 : 1.0-clamp(linearDepth(d)/15.0,0.0,1.0);
+    outColor=vec4(vec3(gray),1.0); return;
+  }
+  if (!before && u_post == 1) {
+    float d = texture(u_depth,v_uv).r;
+    if (d < 0.99999) {
+      float trans = exp(-u_fogDensity * linearDepth(d));
+      c = mix(vec3(0.09,0.14,0.24), c, trans);
+    }
+  }
+  if (!before && u_post == 2) {
+    c *= 1.0 - 0.92 * outlineAmount(v_uv);
+  }
+  if (!before && u_post == 3) {
+    c += texture(u_bloom,v_uv).rgb * u_bloomStrength;
+  }
+  if (!before && u_post == 4) { // tiny illustrative 9-tap image blur
+    vec2 p=1.8/u_resolution;
+    c = neighbor(v_uv) * 0.24;
+    c += (neighbor(v_uv+vec2(p.x,0))+neighbor(v_uv-vec2(p.x,0))
+       +  neighbor(v_uv+vec2(0,p.y))+neighbor(v_uv-vec2(0,p.y))) * 0.12;
+    c += (neighbor(v_uv+p)+neighbor(v_uv-p)
+       +  neighbor(v_uv+vec2(-p.x,p.y))+neighbor(v_uv+vec2(p.x,-p.y))) * 0.07;
+  }
+  if (!before && u_post == 9) {
+    vec2 offset = (v_uv-0.5)*0.023;
+    c.r=neighbor(v_uv+offset).r;
+    c.b=neighbor(v_uv-offset).b;
+  }
+  if (!before && u_post == 12) {
+    vec2 p=1.0/u_resolution;
+    c = c * 2.28 - 0.32 * (neighbor(v_uv+vec2(p.x,0))
+        + neighbor(v_uv-vec2(p.x,0)) + neighbor(v_uv+vec2(0,p.y))
+        + neighbor(v_uv-vec2(0,p.y)));
+  }
+  c = toneMap(max(c,0.0));
+  if (!before && u_post == 5) { c=floor(c*6.0+0.5)/6.0; }
+  if (!before && u_post == 7) {
+    float l=dot(c,vec3(0.2126,0.7152,0.0722));
+    c *= mix(vec3(1.16,0.98,0.87),vec3(0.83,1.02,1.19),smoothstep(0.05,0.95,l));
+    c=clamp(c,0.0,1.0);
+  }
+  c=srgbEncode(c);
+  if (!before && u_post == 8) {
+    uvec2 pixel=uvec2(gl_FragCoord.xy);
+    uint h=hash32(pixel.x + pixel.y*4099u + uint(floor(u_time*28.0))*104729u);
+    float noise=float(h)/4294967295.0-0.5;
+    c=clamp(c + vec3(noise*0.17),0.0,1.0);
+  }
+  outColor = vec4(c,1.0);
+}`;
+
+function compileShader(gl, kind, source) {
+  const shader = gl.createShader(kind);
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    const log = gl.getShaderInfoLog(shader);
+    gl.deleteShader(shader);
+    throw new Error(`Shader compilation error:\n${log}`);
+  }
+  return shader;
+}
+function program(gl, vs, fs) {
+  const p = gl.createProgram();
+  const a = compileShader(gl, gl.VERTEX_SHADER, vs);
+  const b = compileShader(gl, gl.FRAGMENT_SHADER, fs);
+  gl.attachShader(p, a); gl.attachShader(p, b);
+  gl.linkProgram(p); gl.deleteShader(a); gl.deleteShader(b);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+    throw new Error(`Shader link error: ${gl.getProgramInfoLog(p)}`);
+  }
+  return p;
+}
+const vec3 = {
+  sub: (a,b)=>a.map((v,i)=>v-b[i]),
+  dot: (a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],
+  cross: (a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],
+  norm: a=>{ const n=Math.hypot(...a);return a.map(x=>x/n); },
+};
+function perspective(fov, aspect, near, far) {
+  const f=1/Math.tan(fov/2);
+  return new Float32Array([f/aspect,0,0,0, 0,f,0,0,
+    0,0,(far+near)/(near-far),-1, 0,0,2*far*near/(near-far),0]);
+}
+function lookAt(eye, at) {
+  const z=vec3.norm(vec3.sub(eye,at));
+  const x=vec3.norm(vec3.cross([0,1,0],z));
+  const y=vec3.cross(z,x);
+  return new Float32Array([
+    x[0],y[0],z[0],0, x[1],y[1],z[1],0, x[2],y[2],z[2],0,
+    -vec3.dot(x,eye),-vec3.dot(y,eye),-vec3.dot(z,eye),1]);
+}
+function modelMatrix(tx=0,ty=0,tz=0, rotY=0, rotZ=0) {
+  const cy=Math.cos(rotY), sy=Math.sin(rotY), cz=Math.cos(rotZ), sz=Math.sin(rotZ);
+  return new Float32Array([
+    cy*cz, sz, -sy*cz, 0,
+    -cy*sz, cz, sy*sz, 0,
+    sy, 0, cy, 0,
+    tx, ty, tz, 1
+  ]);
+}
+function mesh(gl, vertices, indices) {
+  const vao=gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  const vbo=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,vbo);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+  const ebo=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ebo);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(indices),gl.STATIC_DRAW);
+  for (let a=0;a<3;a++) {
+    const width = a===2?2:3;
+    gl.enableVertexAttribArray(a);
+    gl.vertexAttribPointer(a,width,gl.FLOAT,false,8*4,(a===0?0:a===1?3:6)*4);
+  }
+  gl.bindVertexArray(null);
+  return {vao,count:indices.length};
+}
+function sphere(gl, radius, columns=64, rows=40) {
+  const v=[], ix=[];
+  for(let y=0;y<=rows;y++) for(let x=0;x<=columns;x++) {
+    const theta=2*PI*x/columns, phi=PI*y/rows;
+    const n=[Math.sin(phi)*Math.cos(theta),Math.cos(phi),Math.sin(phi)*Math.sin(theta)];
+    v.push(n[0]*radius,n[1]*radius,n[2]*radius, ...n, x/columns, y/rows);
+  }
+  for(let y=0;y<rows;y++)for(let x=0;x<columns;x++) {
+    const a=y*(columns+1)+x,b=a+columns+1;
+    ix.push(a,a+1,b,a+1,b+1,b);
+  }
+  return mesh(gl,v,ix);
+}
+function torus(gl,major=1.45,minor=0.15,columns=96,rows=18) {
+  const v=[], ix=[];
+  for(let y=0;y<=rows;y++) for(let x=0;x<=columns;x++) {
+    const u=2*PI*x/columns, t=2*PI*y/rows;
+    const c=Math.cos(t),s=Math.sin(t),cu=Math.cos(u),su=Math.sin(u);
+    const n=[c*cu,s,c*su];
+    v.push((major+minor*c)*cu,minor*s,(major+minor*c)*su, ...n,x/columns,y/rows);
+  }
+  for(let y=0;y<rows;y++)for(let x=0;x<columns;x++) {
+    const a=y*(columns+1)+x,b=a+columns+1;
+    ix.push(a,b,a+1,a+1,b,b+1);
+  }
+  return mesh(gl,v,ix);
+}
+function floor(gl) {
+  const s=15;
+  return mesh(gl,[-s,0,-s,0,1,0,0,0, -s,0,s,0,1,0,0,1,
+                   s,0,-s,0,1,0,1,0, s,0,s,0,1,0,1,1], [0,1,2,1,3,2]);
+}
+function box(gl,size=0.65) {
+  const v=[], ix=[];
+  const faces=[
+    {n:[1,0,0], p:[[1,-1,-1],[1,1,-1],[1,-1,1],[1,1,1]]},
+    {n:[-1,0,0],p:[[-1,-1,1],[-1,1,1],[-1,-1,-1],[-1,1,-1]]},
+    {n:[0,1,0], p:[[-1,1,-1],[-1,1,1],[1,1,-1],[1,1,1]]},
+    {n:[0,-1,0],p:[[-1,-1,1],[-1,-1,-1],[1,-1,1],[1,-1,-1]]},
+    {n:[0,0,1], p:[[1,-1,1],[1,1,1],[-1,-1,1],[-1,1,1]]},
+    {n:[0,0,-1],p:[[-1,-1,-1],[-1,1,-1],[1,-1,-1],[1,1,-1]]},
+  ];
+  faces.forEach(f=>{
+    const a=v.length/8;
+    f.p.forEach((p,i)=>v.push(...p.map(x=>x*size),...f.n,i>>1,i&1));
+    ix.push(a,a+1,a+2,a+1,a+3,a+2);
+  });
+  return mesh(gl,v,ix);
+}
+function makeTexture(gl,w,h,format,type,internal,filter=gl.LINEAR) {
+  const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);
+  gl.texStorage2D(gl.TEXTURE_2D,1,internal,w,h);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,filter);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,filter);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  gl.bindTexture(gl.TEXTURE_2D,null);
+  return t;
+}
+function makeTarget(gl,w,h,hdr=true,geometry=false) {
+  const framebuffer=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,framebuffer);
+  const textures=[];
+  const color=makeTexture(gl,w,h,gl.RGBA,hdr?gl.HALF_FLOAT:gl.UNSIGNED_BYTE,
+                          hdr?gl.RGBA16F:gl.RGBA8);
+  textures.push(color);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,color,0);
+  let depth=null, normal=null;
+  if (geometry) {
+    normal=makeTexture(gl,w,h,gl.RGBA,gl.UNSIGNED_BYTE,gl.RGBA8,gl.NEAREST);
+    textures.push(normal);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT1,gl.TEXTURE_2D,normal,0);
+    depth=makeTexture(gl,w,h,gl.DEPTH_COMPONENT,gl.UNSIGNED_INT,gl.DEPTH_COMPONENT24,gl.NEAREST);
+    textures.push(depth);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.TEXTURE_2D,depth,0);
+    gl.drawBuffers([gl.COLOR_ATTACHMENT0,gl.COLOR_ATTACHMENT1]);
+  } else {gl.drawBuffers([gl.COLOR_ATTACHMENT0]);}
+  const status=gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+  if (status!==gl.FRAMEBUFFER_COMPLETE) throw new Error(`Framebuffer incomplete: ${status}`);
+  return {framebuffer,color,normal,depth,textures,w,h};
+}
+const destroyTarget=(gl,t)=>{if(!t)return;for(const tex of t.textures)gl.deleteTexture(tex);gl.deleteFramebuffer(t.framebuffer);};
+
+function createRenderer(canvas) {
+  const gl=canvas.getContext('webgl2',{antialias:true,alpha:false,depth:true,premultipliedAlpha:false});
+  if (!gl) throw new Error('WebGL2 unavailable. Open this guide in a browser with WebGL2 enabled.');
+  const floatColor=!!gl.getExtension('EXT_color_buffer_float');
+  const pScene=program(gl,geometryVS,geometryFS);
+  const pBright=program(gl,fullscreenVS,brightFS);
+  const pBlur=program(gl,fullscreenVS,blurFS);
+  const pCompose=program(gl,fullscreenVS,compositeFS);
+  const quad=gl.createVertexArray();
+  const objects=[
+    {geo:floor(gl), color:[0.16,0.20,0.27],rough:0.92,metal:0.0,mat:2,position:[0,-1.12,0]},
+    {geo:sphere(gl,1.02),color:[0.038,0.37,0.48],rough:.30,metal:.11,mat:0,position:[0,-.02,0]},
+    {geo:torus(gl),color:[0.67,0.33,0.095],rough:.19,metal:.94,mat:1,position:[0,-.02,0]},
+    {geo:sphere(gl,.43,42,26),color:[0.26,0.29,0.72],rough:.42,metal:.03,mat:5,position:[-2,-.65,-.45]},
+    {geo:box(gl,.55),color:[0.44,0.38,0.21],rough:.55,metal:.58,mat:5,position:[2.04,-.55,-.45]},
+    {geo:sphere(gl,.18,32,20),color:[1,.41,.11],rough:.15,metal:0.0,mat:3,position:[1.77,1.56,-.48]},
+  ];
+  let before,after,bright,blurA,blurB,width=0,height=0;
+  let azimuth=0.72,elevation=0.36,zoom=7.1;
+  let playing=false,disposed=false;
+  let lesson={shader:0,beforeShader:0,post:0};
+  let roughness=.30,metallic=.11,split=.5, fogDensity=.19,bloomStrength=1.55;
+  let lastTime=0;
+  const stats={ hdr:floatColor, drawCalls:objects.length*2,
+    get resolution(){return `${width}×${height}`;},
+    get gamma(){return 'sRGB / linear → tone map → sRGB';}
+  };
+  const locationCache=new Map();
+  function ul(p,name) {
+    let m=locationCache.get(p);if(!m){m=new Map();locationCache.set(p,m);}
+    if(!m.has(name))m.set(name,gl.getUniformLocation(p,name));
+    return m.get(name);
+  }
+  const ui=(p,name,val)=>gl.uniform1i(ul(p,name),val);
+  const uf=(p,name,val)=>gl.uniform1f(ul(p,name),val);
+  const uv2=(p,name,a,b)=>gl.uniform2f(ul(p,name),a,b);
+  const uv3=(p,name,v)=>gl.uniform3fv(ul(p,name),v);
+  const um4=(p,name,m)=>gl.uniformMatrix4fv(ul(p,name),false,m);
+  const sampler=(p,name,unit,t)=>{
+    gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,t);ui(p,name,unit);
+  };
+  function resize() {
+    // Bound DPR for reasonable educational GPU load.
+    const cssW=Math.max(350,Math.round(canvas.clientWidth));
+    const cssH=Math.max(250,Math.round(canvas.clientHeight));
+    const dpr=Math.min(window.devicePixelRatio||1,1.5);
+    const w=Math.round(cssW*dpr/2)*2,h=Math.round(cssH*dpr/2)*2;
+    if(w===width&&h===height)return;
+    width=w;height=h;canvas.width=w;canvas.height=h;
+    [before,after,bright,blurA,blurB].forEach(t=>destroyTarget(gl,t));
+    before=makeTarget(gl,w,h,floatColor,true);
+    after=makeTarget(gl,w,h,floatColor,true);
+    const bw=Math.max(1,Math.floor(w/2)), bh=Math.max(1,Math.floor(h/2));
+    bright=makeTarget(gl,bw,bh,floatColor);
+    blurA=makeTarget(gl,bw,bh,floatColor);
+    blurB=makeTarget(gl,bw,bh,floatColor);
+  }
+  function sceneTo(target,shading,time,eye,view,proj) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER,target.framebuffer);
+    gl.viewport(0,0,width,height);
+    gl.drawBuffers([gl.COLOR_ATTACHMENT0,gl.COLOR_ATTACHMENT1]);
+    gl.enable(gl.DEPTH_TEST);gl.depthMask(true);
+    gl.enable(gl.CULL_FACE);gl.cullFace(gl.BACK);
+    gl.clearColor(0.033,0.050,0.083,1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+    gl.useProgram(pScene);
+    um4(pScene,'u_view',view); um4(pScene,'u_projection',proj);
+    uv3(pScene,'u_camera',eye);
+    ui(pScene,'u_shading',shading);uf(pScene,'u_time',time);
+    objects.forEach((o,i)=>{
+      let rotY = i === 2 ? -0.18 : i === 4 ? 0.55 : 0;
+      let rotZ = i === 2 ? 0.59 : 0;
+      const model=modelMatrix(...o.position,rotY,rotZ);
+      um4(pScene,'u_model',model);
+      uv3(pScene,'u_baseColor',o.color);
+      uf(pScene,'u_roughness',i===1?roughness:o.rough);
+      uf(pScene,'u_metallic',i===1?metallic:o.metal);
+      ui(pScene,'u_material',o.mat);
+      gl.bindVertexArray(o.geo.vao);gl.drawElements(gl.TRIANGLES,o.geo.count,gl.UNSIGNED_SHORT,0);
+    });
+    gl.bindVertexArray(null);
+  }
+  function quadTo(programRef,target) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER,target?.framebuffer??null);
+    gl.viewport(0,0,target?.w??width,target?.h??height);
+    gl.disable(gl.DEPTH_TEST);gl.disable(gl.CULL_FACE);
+    gl.useProgram(programRef);gl.bindVertexArray(quad);
+  }
+  function draw(time) {
+    if(disposed)return;
+    resize();
+    // Static scene by default: before and after show identical camera poses.
+    const eye=[Math.sin(azimuth)*Math.cos(elevation)*zoom,
+               Math.sin(elevation)*zoom+0.52,
+               Math.cos(azimuth)*Math.cos(elevation)*zoom];
+    const view=lookAt(eye,[0,.0,0]);
+    const proj=perspective(43*PI/180,width/height,NEAR,FAR);
+    sceneTo(before,lesson.beforeShader,time,eye,view,proj);
+    sceneTo(after,lesson.shader,time,eye,view,proj);
+    if(lesson.post===3) {
+      quadTo(pBright,bright);sampler(pBright,'u_input',0,after.color);gl.drawArrays(gl.TRIANGLES,0,3);
+      quadTo(pBlur,blurA);sampler(pBlur,'u_input',0,bright.color);
+      uv2(pBlur,'u_step',1/bright.w,0);gl.drawArrays(gl.TRIANGLES,0,3);
+      quadTo(pBlur,blurB);sampler(pBlur,'u_input',0,blurA.color);
+      uv2(pBlur,'u_step',0,1/bright.h);gl.drawArrays(gl.TRIANGLES,0,3);
+    }
+    quadTo(pCompose,null);
+    sampler(pCompose,'u_before',0,before.color);
+    sampler(pCompose,'u_after',1,after.color);
+    sampler(pCompose,'u_normals',2,after.normal);
+    sampler(pCompose,'u_depth',3,after.depth);
+    sampler(pCompose,'u_bloom',4,blurB.color);
+    uf(pCompose,'u_split',split);ui(pCompose,'u_post',lesson.post);
+    uf(pCompose,'u_time',time);uv2(pCompose,'u_resolution',width,height);
+    uf(pCompose,'u_fogDensity',fogDensity);
+    uf(pCompose,'u_bloomStrength',bloomStrength);
+    uf(pCompose,'u_hdr',floatColor?1:0);
+    gl.drawArrays(gl.TRIANGLES,0,3);
+    gl.bindVertexArray(null);
+    const err=gl.getError();
+    if(err!==gl.NO_ERROR&&window.__shaderGuideDebug)console.warn('GL error',err);
+  }
+  let raf;
+  let dirty=true;
+  function frame(t) {
+    if(disposed)return;
+    if(playing){lastTime=t*.001;dirty=true;}
+    if(dirty){draw(lastTime);dirty=false;}
+    raf=requestAnimationFrame(frame);
+  }
+  // Drag rotates the same geometry in both comparison halves.
+  let down=false,prevX=0,prevY=0;
+  canvas.addEventListener('pointerdown',e=>{down=true;prevX=e.clientX;prevY=e.clientY;canvas.setPointerCapture(e.pointerId);});
+  canvas.addEventListener('pointermove',e=>{
+    if(!down)return;
+    azimuth-=(e.clientX-prevX)*.006;
+    elevation=Math.min(1.25,Math.max(-.08,elevation+(e.clientY-prevY)*.004));
+    prevX=e.clientX;prevY=e.clientY;dirty=true;
+  });
+  canvas.addEventListener('pointerup',()=>{down=false;});
+  canvas.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.min(14,Math.max(4.2,zoom+e.deltaY*.007));dirty=true;},{passive:false});
+  if (typeof ResizeObserver!=='undefined') new ResizeObserver(()=>{dirty=true;}).observe(canvas);
+  // GL status is exposed for inspection and screenshot tests.
+  requestAnimationFrame(frame);
+  return {
+    stats,
+    setLesson(value){lesson=value;playing=value.post===8;dirty=true;},
+    setSplit(value){split=Number(value);dirty=true;},
+    setRoughness(value){roughness=Number(value);dirty=true;},
+    setMetallic(value){metallic=Number(value);dirty=true;},
+    setFogDensity(value){fogDensity=Number(value);dirty=true;},
+    setBloomStrength(value){bloomStrength=Number(value);dirty=true;},
+    setPlaying(value){playing=!!value;dirty=true;},
+    resetCamera(){azimuth=.72;elevation=.36;zoom=7.1;dirty=true;},
+    renderOnce(){draw(lastTime);},
+    dispose(){disposed=true;cancelAnimationFrame(raf);},
+  };
+}
+
+
+/* -------- src/fallback.js -------- */
+/**
+ * Marked illustration fallback for browsers/environment where WebGL2 is blocked.
+ * These Canvas2D drawings ARE NOT shader executions. The WebGL2 path remains authoritative.
+ */
+function createFallbackRenderer(canvas) {
+  const ctx=canvas.getContext('2d');
+  if(!ctx) throw new Error('Neither WebGL2 nor Canvas2D is available.');
+  const W=860,H=520;
+  const before=document.createElement('canvas'),after=document.createElement('canvas');
+  before.width=after.width=W;before.height=after.height=H;
+  let lesson={shader:0,beforeShader:1,post:0},split=.5,rough=.3,metal=.11,fog=.19,bloom=1.55, angle=0;
+  let dirty=true;
+  const ref=before.getContext('2d',{willReadFrequently:true});
+  const fx=after.getContext('2d',{willReadFrequently:true});
+  function colors(id) {return id===3?['#5f998f','#2c5c65','#0f333d']:['#6cb6bc','#23727d','#082d41'];}
+  const grd=(c,x,y,r,stops)=>{
+    const g=c.createRadialGradient(x-r*.25,y-r*.4,2,x,y,r);
+    for(const [p,col] of stops)g.addColorStop(p,col);
+    return g;
+  };
+  function scene(c,shader,post) {
+    c.clearRect(0,0,W,H);
+    const bg=c.createLinearGradient(0,0,0,H);bg.addColorStop(0,'#142534');bg.addColorStop(1,'#233943');c.fillStyle=bg;c.fillRect(0,0,W,H);
+    const horizon=350;
+    c.fillStyle='#1e3440';c.fillRect(0,horizon,W,H-horizon);
+    c.strokeStyle='#5a747c2c';c.lineWidth=1;
+    for(let i=-8;i<=8;i++){const xx=W/2+i*76;c.beginPath();c.moveTo(W/2,horizon-2);c.lineTo(xx+i*42,H);c.stroke();}
+    for(let i=0;i<9;i++) {const t=i/9;c.beginPath();let y=horizon+Math.pow(t,1.5)*(H-horizon);c.moveTo(0,y);c.lineTo(W,y);c.stroke();}
+    const sx=430+Math.sin(angle)*13,sy=272,rr=135;
+    c.save();c.translate(sx,sy+148);c.scale(1,.26);
+    c.fillStyle=grd(c,0,0,180,[[0,'#071c26a8'],[1,'#071c2600']]);
+    c.beginPath();c.arc(0,0,180,0,2*Math.PI);c.fill();c.restore();
+    // The back half of the decorative orbit.
+    c.save();c.translate(sx,sy);c.rotate(-.33);
+    c.strokeStyle='#907343';c.lineWidth=22;c.beginPath();c.ellipse(0,0,197,88,0,Math.PI,2*Math.PI);c.stroke();
+    c.strokeStyle='#dfb96e';c.lineWidth=8;c.beginPath();c.ellipse(0,0,195,87,0,Math.PI,2*Math.PI);c.stroke();c.restore();
+    // Small blue specimen.
+    c.beginPath();c.arc(185,352,57,0,2*Math.PI);
+    c.fillStyle=grd(c,185,352,64,[[0,'#aebce9'],[.4,'#586cae'],[1,'#26386e']]);c.fill();
+    // Gold block.
+    c.save();c.translate(677,350);c.rotate(-.16);
+    const cube=c.createLinearGradient(-45,-48,45,45);cube.addColorStop(0,'#f9d38f');cube.addColorStop(1,'#66503a');
+    c.fillStyle=cube;c.fillRect(-49,-49,98,98);c.strokeStyle='#e1ba67';c.lineWidth=3;c.strokeRect(-49,-49,98,98);c.restore();
+    // Main specimen: shaded sphere, same silhouette across all 17 sections.
+    c.beginPath();c.arc(sx,sy,rr,0,2*Math.PI);c.closePath();
+    if(shader===3) {
+      c.fillStyle=grd(c,sx,sy,rr,[[0,'#6ed9c4'],[.34,'#60aeb4'],[.35,'#3b8790'],[.72,'#377783'],[.73,'#1b596a'],[1,'#164251']]);
+    } else if(shader===1) {
+      c.fillStyle=grd(c,sx,sy,rr,[[0,'#66b0ac'],[.43,'#4b999d'],[1,'#194457']]);
+    } else if(shader===5) {
+      c.fillStyle='#4596a0';
+    } else {
+      c.fillStyle=grd(c,sx,sy,rr,[[0,'#d5f5e9'],[Math.max(.04,.26*rough),'#6accbf'],[.48,'#347f8a'],[1,'#102d40']]);
+    }
+    c.fill();
+    if(shader===0||shader===2||shader===4||shader===6){
+      c.save();c.beginPath();c.arc(sx,sy,rr,0,Math.PI*2);c.clip();
+      const intensity=shader===2?.71:Math.max(.25,1.0-rough*.5);
+      c.fillStyle=grd(c,sx-37,sy-44,rr*.50,[[0,`rgba(255,255,239,${.8*intensity})`],[1,'rgba(200,245,247,0)']]);
+      c.beginPath();c.ellipse(sx-40,sy-54,28+rough*36,17+rough*40,-.55,0,Math.PI*2);c.fill();
+      c.restore();
+    }
+    if(shader===4){c.lineWidth=13;c.strokeStyle='#a5ecf6';c.stroke();}
+    if(shader===6){
+      c.save();c.beginPath();c.arc(sx,sy,rr,0,Math.PI*2);c.clip();
+      c.lineWidth=1.2;c.strokeStyle='#c8e5e848';for(let i=-7;i<8;i++){c.beginPath();c.moveTo(sx-160,sy+i*21);c.lineTo(sx+160,sy+i*21-20);c.stroke();}c.restore();
+    }
+    // Front half of orbital ring.
+    c.save();c.translate(sx,sy);c.rotate(-.33);
+    c.strokeStyle='#a0732d';c.lineWidth=24;c.beginPath();c.ellipse(0,0,197,88,0,0,Math.PI);c.stroke();
+    c.strokeStyle='#f9d58b';c.lineWidth=10;c.beginPath();c.ellipse(0,0,197,88,0,.05,Math.PI-.05);c.stroke();c.restore();
+    // Bright orb, demonstrates why HDR bloom needs an emission source.
+    c.beginPath();c.arc(676,123,18,0,Math.PI*2);c.fillStyle='#ffb36b';c.shadowColor='#ffb36b';c.shadowBlur=post===3?bloom*75:9;c.fill();c.shadowBlur=0;
+    // Small details keep the same image recognizable for comparisons.
+    c.strokeStyle='#ffffff28';c.lineWidth=1;c.beginPath();c.moveTo(35,35);c.lineTo(35,75);c.moveTo(35,35);c.lineTo(75,35);c.stroke();
+    if(post===2){c.beginPath();c.arc(sx,sy,rr+1,0,2*Math.PI);c.strokeStyle='#081a25';c.lineWidth=7;c.stroke();}
+    if(post===1){c.fillStyle=`rgba(128,159,180,${Math.min(.49,fog*1.8)})`;c.fillRect(0,150,W,H-150);}
+    if(post===7){c.fillStyle='#a9562014';c.fillRect(0,0,W,H);c.fillStyle='#2c5c8028';c.fillRect(0,0,W,230);}
+    if(post===10){c.clearRect(0,0,W,H);c.fillStyle='#818dce';c.fillRect(0,0,W,H);c.beginPath();c.arc(sx,sy,rr,0,Math.PI*2);c.fillStyle=grd(c,sx,sy,rr,[[0,'#7df3df'],[.4,'#86a3e6'],[1,'#5159a8']]);c.fill();}
+    if(post===11){c.clearRect(0,0,W,H);c.fillStyle='#090e14';c.fillRect(0,0,W,H);c.fillStyle='#a2a9af';c.beginPath();c.arc(sx,sy,rr,0,Math.PI*2);c.fill();}
+  }
+  function apply(c,post) {
+    if(![4,5,6,8,9,12].includes(post))return;
+    const im=c.getImageData(0,0,W,H),a=im.data;
+    if(post===4||post===12){
+      const clone=new Uint8ClampedArray(a),weight=post===4?[.18,.14]:[2.2,-.30];
+      for(let y=2;y<H-2;y++)for(let x=2;x<W-2;x++){
+        const p=(y*W+x)*4;
+        for(let ch=0;ch<3;ch++) {
+          const nei=(clone[p-4+ch]+clone[p+4+ch]+clone[p-W*4+ch]+clone[p+W*4+ch]);
+          a[p+ch]=post===4?clone[p+ch]*.28+nei*.18:clone[p+ch]*weight[0]+nei*weight[1];
+        }
+      }
+    }else if(post===5){for(let i=0;i<a.length;i+=4)for(let ch=0;ch<3;ch++)a[i+ch]=Math.round(a[i+ch]/42.5)*42.5;}
+    else if(post===6){const clone=new Uint8ClampedArray(a),scale=11;for(let y=0;y<H;y++)for(let x=0;x<W;x++){const p=(y*W+x)*4,q=((Math.min(H-1,Math.floor(y/scale)*scale+5))*W+Math.min(W-1,Math.floor(x/scale)*scale+5))*4;for(let ch=0;ch<3;ch++)a[p+ch]=clone[q+ch];}}
+    else if(post===8){for(let y=0;y<H;y++)for(let x=0;x<W;x++){const p=(y*W+x)*4,n=(Math.sin((x*12.989+y*78.233))*43758.5453)%1;for(let ch=0;ch<3;ch++)a[p+ch]+=n*18;}}
+    else if(post===9){const clone=new Uint8ClampedArray(a);for(let y=0;y<H;y++)for(let x=0;x<W;x++){const p=(y*W+x)*4,dx=Math.round((x-W*.5)/55),rx=Math.max(0,Math.min(W-1,x+dx)),bx=Math.max(0,Math.min(W-1,x-dx));a[p]=clone[(y*W+rx)*4];a[p+2]=clone[(y*W+bx)*4+2];}}
+    c.putImageData(im,0,0);
+  }
+  function draw(){
+    const w=canvas.clientWidth||860,h=canvas.clientHeight||520,dpr=Math.min(devicePixelRatio||1,1.5);
+    const pxW=Math.round(w*dpr),pxH=Math.round(h*dpr);
+    if(canvas.width!==pxW||canvas.height!==pxH){canvas.width=pxW;canvas.height=pxH;}
+    scene(ref,lesson.beforeShader,0);scene(fx,lesson.shader,lesson.post);apply(fx,lesson.post);
+    ctx.clearRect(0,0,pxW,pxH);
+    ctx.drawImage(before,0,0,pxW,pxH);
+    ctx.save();ctx.beginPath();ctx.rect(pxW*split,0,pxW*(1-split),pxH);ctx.clip();ctx.drawImage(after,0,0,pxW,pxH);ctx.restore();
+    dirty=false;
+  }
+  function raf(){if(dirty)draw();requestAnimationFrame(raf);}
+  requestAnimationFrame(raf);
+  return {
+    stats:{hdr:false,resolution:'Illustrative Canvas2D',gamma:'not a shader renderer'},
+    isFallback:true,
+    setLesson(v){lesson=v;dirty=true;},setSplit(v){split=+v;dirty=true;},
+    setRoughness(v){rough=+v;dirty=true;},setMetallic(v){metal=+v;dirty=true;},
+    setFogDensity(v){fog=+v;dirty=true;},setBloomStrength(v){bloom=+v;dirty=true;},
+    resetCamera(){angle=0;dirty=true;},setPlaying(){},renderOnce(){draw();},dispose(){}
+  };
+}
+
+
+/* -------- src/main.js -------- */
+const $ = (id) => document.getElementById(id);
+const list = $('lessonList');
+let selected = LESSONS[0];
+let renderer = null;
+
+function addLessonButton(lesson) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'lesson-button';
+  b.dataset.lessonId = lesson.id;
+  b.innerHTML = `<span class="index">${lesson.number}</span><span>${lesson.title}</span>`;
+  b.addEventListener('click',()=>selectLesson(lesson.id));
+  list.append(b);
+}
+for(const group of GROUPS) {
+  const chapters = LESSONS.filter(x=>x.group===group.key);
+  if(!chapters.length)continue;
+  const h = document.createElement('div');
+  h.className = 'group-label';h.textContent = group.label;list.append(h);
+  chapters.forEach(addLessonButton);
+}
+function selectLesson(id) {
+  const l=LESSONS.find(v=>v.id===id);
+  if(!l)return;
+  selected=l;
+  for(const b of document.querySelectorAll('.lesson-button')) {
+    const active = b.dataset.lessonId===id;
+    b.classList.toggle('active',active);
+    b.setAttribute('aria-current',active?'true':'false');
+  }
+  $('chapterNumber').textContent=`${l.number} / ${l.group}`;
+  $('chapterTitle').textContent=l.title;
+  $('chapterIntro').textContent=l.intuition;
+  $('stageInfo').textContent=l.stage;
+  $('dataInfo').textContent=l.data;
+  $('shaderCode').textContent=l.snippet;
+  $('chapterCaveat').textContent=l.caveat;
+  $('beforeLabel').textContent=`BEFORE · ${l.baseline}`;
+  $('afterLabel').textContent=`AFTER · ${l.after}`;
+  $('passType').textContent=l.stage.toUpperCase();
+  $('effectName').textContent=l.post===1?'Fog density':l.post===3?'Bloom strength':'Effect intensity';
+  const effect=$('effectParam');
+  const enabled=l.post===1||l.post===3;
+  effect.disabled=!enabled;
+  effect.style.opacity=enabled?'1':'.34';
+  if(l.post===1){effect.min='.01';effect.max='.65';effect.step='.01';effect.value='.19';}
+  if(l.post===3){effect.min='.2';effect.max='4';effect.step='.05';effect.value='1.55';}
+  $('effectParamValue').textContent=enabled?Number(effect.value).toFixed(2):'—';
+  renderer?.setLesson(l);
+  history.replaceState(null,'',`#${id}`);
+}
+function setSlider(id, method) {
+  $(id).addEventListener('input',e=>{
+    $(id+'Value').textContent=(+e.target.value).toFixed(2);
+    renderer?.[method](e.target.value);
+  });
+}
+setSlider('roughness','setRoughness');setSlider('metallic','setMetallic');
+$('effectParam').addEventListener('input',e=>{
+  $('effectParamValue').textContent=(+e.target.value).toFixed(2);
+  if(selected.post===1)renderer?.setFogDensity(e.target.value);
+  if(selected.post===3)renderer?.setBloomStrength(e.target.value);
+});
+$('split').addEventListener('input',e=>{
+  const p=+e.target.value/100;
+  renderer?.setSplit(p);
+  $('splitLine').style.left=`${p*100}%`;
+  $('splitText').textContent=`${Math.round(p*100)}%`;
+});
+$('resetCamera').addEventListener('click',()=>renderer?.resetCamera());
+$('copyCode').addEventListener('click',async()=>{
+  const text=selected.snippet;
+  try{await navigator.clipboard.writeText(text);$('copyCode').textContent='Copied';}
+  catch{const code=$('shaderCode');const selection=window.getSelection();const range=document.createRange();range.selectNodeContents(code);selection.removeAllRanges();selection.addRange(range);$('copyCode').textContent='Select + copy';}
+  setTimeout(()=>$('copyCode').textContent='Copy',1100);
+});
+try{
+  renderer=createRenderer($('scene'));
+  window.__shaderGuide={get selected(){return selected.id;}, renderer, lessons:LESSONS.map(l=>l.id), select:selectLesson};
+  $('renderMode').textContent=renderer.stats.hdr?'HDR HALF-FLOAT · WEBGL2':'SDR FALLBACK · WEBGL2';
+  const refreshMeta=()=>{$('resolution').textContent=renderer.stats.resolution;};
+  setInterval(refreshMeta,1000);
+}catch(error){
+  console.warn('WebGL2 unavailable; activating a clearly labeled Canvas2D illustration.',error.message);
+  try {
+    renderer = createFallbackRenderer($('scene'));
+    window.__shaderGuide={get selected(){return selected.id;}, renderer, lessons:LESSONS.map(l=>l.id), select:selectLesson};
+    $('renderMode').textContent='ILLUSTRATIVE 2D FALLBACK · NOT GPU SHADERS';
+    $('resolution').textContent='WebGL2 unavailable in this environment';
+    document.querySelector('.render-meta span:last-child').textContent='2D approximation · GPU version in WebGL2 browsers';
+  } catch(second) {
+    $('error').style.display='grid';
+    $('error').textContent=`Rendering unavailable: ${second.message}`;
+    $('renderMode').textContent='RENDERING UNAVAILABLE';
+  }
+}
+selectLesson(location.hash.slice(1)||'pbr');
+
+</script>
+</body>
+</html>
