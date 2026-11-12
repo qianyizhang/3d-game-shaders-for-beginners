@@ -5,6 +5,10 @@ const $ = (id) => document.getElementById(id);
 const list = $('lessonList');
 let selected = LESSONS[0];
 let renderer = null;
+const effectControls = {
+  1: {label:'Fog density', min:.01, max:.65, step:.01, value:.19, setter:'setFogDensity'},
+  3: {label:'Bloom strength', min:.2, max:4, step:.05, value:1.55, setter:'setBloomStrength'},
+};
 
 function addLessonButton(lesson) {
   const b = document.createElement('button');
@@ -26,6 +30,8 @@ function selectLesson(id) {
   const l=LESSONS.find(v=>v.id===id);
   if(!l)return;
   selected=l;
+  const illustration=renderer?.isFallback;
+  const bloomUnavailable=l.post===3 && renderer && !illustration && !renderer.stats.hdr;
   for(const b of document.querySelectorAll('.lesson-button')) {
     const active = b.dataset.lessonId===id;
     b.classList.toggle('active',active);
@@ -37,18 +43,25 @@ function selectLesson(id) {
   $('stageInfo').textContent=l.stage;
   $('dataInfo').textContent=l.data;
   $('shaderCode').textContent=l.snippet;
-  $('chapterCaveat').textContent=l.caveat;
+  $('chapterCaveat').textContent=bloomUnavailable
+    ? 'HDR bloom requires a floating-point color target. This device is rendering the base scene in SDR.'
+    : illustration && l.post===3 ? 'This is an illustration of glow. No HDR or GPU shader runs here.' : l.caveat;
   $('beforeLabel').textContent=`BEFORE · ${l.baseline}`;
-  $('afterLabel').textContent=`AFTER · ${l.after}`;
+  $('afterLabel').textContent=bloomUnavailable ? 'HDR BLOOM UNAVAILABLE'
+    : `AFTER · ${illustration && l.post===3?'Illustrative glow':l.after}`;
   $('passType').textContent=l.stage.toUpperCase();
-  $('effectName').textContent=l.post===1?'Fog density':l.post===3?'Bloom strength':'Effect intensity';
+  const control=effectControls[l.post];
+  $('effectName').textContent=control?.label??'Effect intensity';
   const effect=$('effectParam');
-  const enabled=l.post===1||l.post===3;
+  const enabled=!!(renderer && control && !bloomUnavailable);
   effect.disabled=!enabled;
   effect.style.opacity=enabled?'1':'.34';
-  if(l.post===1){effect.min='.01';effect.max='.65';effect.step='.01';effect.value='.19';}
-  if(l.post===3){effect.min='.2';effect.max='4';effect.step='.05';effect.value='1.55';}
-  $('effectParamValue').textContent=enabled?Number(effect.value).toFixed(2):'—';
+  if(control){
+    Object.assign(effect,{min:control.min,max:control.max,step:control.step,value:control.value});
+    if(enabled)renderer[control.setter](control.value);
+  }
+  $('effectParamValue').textContent=enabled?control.value.toFixed(2):'—';
+  $('metallic').disabled=!renderer||l.id==='blinn';
   renderer?.setLesson(l);
   history.replaceState(null,'',`#${id}`);
 }
@@ -60,9 +73,11 @@ function setSlider(id, method) {
 }
 setSlider('roughness','setRoughness');setSlider('metallic','setMetallic');
 $('effectParam').addEventListener('input',e=>{
-  $('effectParamValue').textContent=(+e.target.value).toFixed(2);
-  if(selected.post===1)renderer?.setFogDensity(e.target.value);
-  if(selected.post===3)renderer?.setBloomStrength(e.target.value);
+  const control=effectControls[selected.post];
+  if(!control||e.target.disabled)return;
+  control.value=Number(e.target.value);
+  $('effectParamValue').textContent=control.value.toFixed(2);
+  renderer[control.setter](control.value);
 });
 $('split').addEventListener('input',e=>{
   const p=+e.target.value/100;
@@ -77,19 +92,23 @@ $('copyCode').addEventListener('click',async()=>{
   catch{const code=$('shaderCode');const selection=window.getSelection();const range=document.createRange();range.selectNodeContents(code);selection.removeAllRanges();selection.addRange(range);$('copyCode').textContent='Select + copy';}
   setTimeout(()=>$('copyCode').textContent='Copy',1100);
 });
+const scene=$('scene');
 try{
-  renderer=createRenderer($('scene'));
+  renderer=createRenderer(scene);
   window.__shaderGuide={get selected(){return selected.id;}, renderer, lessons:LESSONS.map(l=>l.id), select:selectLesson};
   $('renderMode').textContent=renderer.stats.hdr?'HDR HALF-FLOAT · WEBGL2':'SDR FALLBACK · WEBGL2';
   const refreshMeta=()=>{$('resolution').textContent=renderer.stats.resolution;};
   setInterval(refreshMeta,1000);
 }catch(error){
-  console.warn('WebGL2 unavailable; activating a clearly labeled Canvas2D illustration.',error.message);
+  console.warn('WebGL2 could not start; showing a Canvas2D illustration.',error.message);
   try {
-    renderer = createFallbackRenderer($('scene'));
+    // A canvas that already acquired WebGL cannot switch to a 2D context.
+    const illustration=scene.cloneNode(false);
+    scene.replaceWith(illustration);
+    renderer = createFallbackRenderer(illustration);
     window.__shaderGuide={get selected(){return selected.id;}, renderer, lessons:LESSONS.map(l=>l.id), select:selectLesson};
     $('renderMode').textContent='ILLUSTRATIVE 2D FALLBACK · NOT GPU SHADERS';
-    $('resolution').textContent='WebGL2 unavailable in this environment';
+    $('resolution').textContent='WebGL2 did not start';
     document.querySelector('.render-meta span:last-child').textContent='2D approximation · GPU version in WebGL2 browsers';
   } catch(second) {
     $('error').style.display='grid';
@@ -97,4 +116,5 @@ try{
     $('renderMode').textContent='RENDERING UNAVAILABLE';
   }
 }
-selectLesson(location.hash.slice(1)||'pbr');
+const requested=location.hash.slice(1);
+selectLesson(LESSONS.some(l=>l.id===requested)?requested:LESSONS[0].id);

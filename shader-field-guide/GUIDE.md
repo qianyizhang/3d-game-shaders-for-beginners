@@ -182,7 +182,7 @@ Every original section is represented below, including the original setup materi
 | 6 | Render to texture | Live | Scene FBO, MRT normals, depth attachment, post passes |
 | 7 | Texturing | Guide | UV interpolation, sRGB base color vs data maps |
 | 8 | Lighting | Live | Lambert vs GGX microfacet PBR |
-| 9 | Blinn–Phong | Live | Baseline highlight vs energy-aware PBR |
+| 9 | Blinn–Phong | Live | Lambert diffuse vs diffuse with a Blinn–Phong highlight |
 | 10 | Fresnel factor | Live | Schlick Fresnel inside GGX BRDF |
 | 11 | Rim lighting | Live | Separate artistic glow from Fresnel |
 | 12 | Cel shading | Live | Quantized diffuse lighting |
@@ -190,7 +190,7 @@ Every original section is represented below, including the original setup materi
 | 14 | Deferred rendering | Guide | Forward / forward+ / deferred tradeoff |
 | 15 | Fog | Live | Exponential attenuation using linear depth |
 | 16 | Blur | Live | 9-tap preview; separable Gaussian in bloom pipeline |
-| 17 | Bloom | Live | HDR extraction + half-res separable blur + recombination |
+| 17 | Bloom | Live with HDR targets | HDR extraction + half-res separable blur + recombination |
 | 18 | SSAO | Guide | Depth-based samples, reconstruction, denoising, GTAO |
 | 19 | Motion blur | Guide | Per-object and camera motion vectors, exposure samples |
 | 20 | Chromatic aberration | Live | Offset RGB sampling |

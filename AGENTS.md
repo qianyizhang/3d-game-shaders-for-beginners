@@ -1,0 +1,8 @@
+# Working in this repository
+
+- **Native reference:** `demonstration/src/main.cxx` owns pass order, inputs, scene controls, and buffer names. Inspect it and the affected shader before changing behavior. Keep multi-output GLSL bindings aligned with their framebuffer attachment order; the macOS shader fix depends on explicit slot assignments.
+- **Mac builds and captures:** Follow [Native mill reference](project-docs/native-reference.md). Use the capture CLI for repeatable checks; record source revision, preset, frame, output buffer, and overrides. Judge a visible change against matching reference settings.
+- **Browser port:** Read the [Mill Shader Lab build checklist](project-docs/mill-shader-lab.md) before implementing or judging parity.
+- **Browser lessons:** `shader-field-guide/` is the independent WebGL2 draft. Distinguish techniques the renderer actually runs from illustrations and written coverage. Preserve scene control and inspection when porting the native lessons.
+- **Assets:** Keep original mill conversions and captures for local learning. Follow the [upstream license scope](README.md#license) when packaging or sharing. Keep asset roles separate from file paths so another scene can replace the mill.
+- **Documentation:** Put new project docs in `project-docs/`. For original tutorial edits, edit `sections/*.md` as the source of the original lessons and keep the corresponding generated `docs/*.html` in sync. Keep machine-specific SDK files, captures, and converted assets out of Git.

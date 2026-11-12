@@ -22,7 +22,7 @@ Run the executable from the `demonstration` directory, where it can find its sha
 
 ### Mac
 
-Use the SDK path from the build step. Set `PANDA_PRC_DIR` so Panda3D loads the demo settings before creating the audio manager.
+Use the SDK path from the build step. Set `PANDA_PRC_DIR` to select the demo configuration directory.
 
 ```bash
 PANDA3D=/Library/Developer/Panda3D

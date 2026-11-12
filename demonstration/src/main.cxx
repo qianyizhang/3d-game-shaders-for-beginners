@@ -10,6 +10,7 @@
 #include <chrono>
 #include <thread>
 #include <algorithm>
+#include <iostream>
 
 #include "pandaFramework.h" // Panda3D 1.10.9
 #include "renderBuffer.h"
@@ -45,6 +46,7 @@
 #include "linearEulerIntegrator.h"
 #include "audioManager.h"
 #include "audioSound.h"
+#include "clockObject.h"
 
 // STRUCTURES
 
@@ -117,7 +119,6 @@ void showBuffer
   ( NodePath render2d
   , NodePath statusNP
   , std::tuple<std::string, PT(GraphicsOutput), int> bufferTexture
-  , bool alpha
   );
 
 void hideBuffer
@@ -269,7 +270,7 @@ std::default_random_engine generator;
 
 PT(AsyncTaskManager) taskManager = AsyncTaskManager::get_global_ptr();
 
-PT(AudioManager) audioManager = AudioManager::create_AudioManager();
+PT(AudioManager) audioManager;
 
 ParticleSystemManager particleSystemManager = ParticleSystemManager();
 
@@ -279,10 +280,84 @@ PhysicsManager physicsManager = PhysicsManager();
 
 // MAIN
 
+namespace {
+struct CaptureOptions {
+  std::string path;
+  std::string preset = "midday";
+  std::string buffer = "final";
+  int frames = 60;
+  bool depthOfField = true;
+  bool particles = true;
+};
+
+void captureUsage(std::ostream &out) {
+  out << "Usage: 3d-game-shaders-for-beginners [--capture FILE.png"
+      << " [--preset midday|midnight] [--buffer NAME] [--frames 1..120]"
+      << " [--disable depth-of-field] [--disable particles]]\n"
+      << "Capture is offscreen and silent. Buffers use the names shown by Tab"
+      << " in the interactive demo (or 'final').\n";
+}
+
+bool parseCaptureOptions(int argc, char *argv[], CaptureOptions &options) {
+  if (argc < 3) { return false; }
+  options.path = argv[2];
+  if (options.path.size() <= 4 ||
+      options.path.substr(options.path.size() - 4) != ".png") {
+    return false;
+  }
+
+  for (int i = 3; i < argc; i += 2) {
+    if (i + 1 >= argc) { return false; }
+    const std::string flag = argv[i];
+    const std::string value = argv[i + 1];
+    if (flag == "--preset" && (value == "midday" || value == "midnight")) {
+      options.preset = value;
+    } else if (flag == "--buffer" && !value.empty()) {
+      options.buffer = value;
+    } else if (flag == "--disable" && value == "depth-of-field") {
+      options.depthOfField = false;
+    } else if (flag == "--disable" && value == "particles") {
+      options.particles = false;
+    } else if (flag == "--frames") {
+      if (value.empty() || value.size() > 3 ||
+          value.find_first_not_of("0123456789") != std::string::npos) {
+        return false;
+      }
+      options.frames = std::stoi(value);
+      if (options.frames < 1 || options.frames > 120) { return false; }
+    } else {
+      return false;
+    }
+  }
+  return true;
+}
+}
+
 int main
   ( int argc
   , char *argv[]
   ) {
+  if (argc == 2 && std::string(argv[1]) == "--help") {
+    captureUsage(std::cout);
+    return 0;
+  }
+  const bool capturing = argc > 1 && std::string(argv[1]) == "--capture";
+  CaptureOptions capture;
+  if (capturing && !parseCaptureOptions(argc, argv, capture)) {
+    captureUsage(std::cerr);
+    return 2;
+  }
+  if (!capturing) {
+    for (int i = 1; i < argc; ++i) {
+      const std::string arg = argv[i];
+      if (arg == "--capture" || arg == "--preset" || arg == "--buffer"
+          || arg == "--frames" || arg == "--disable") {
+        std::cerr << "Capture options must follow --capture FILE.png.\n";
+        captureUsage(std::cerr);
+        return 2;
+      }
+    }
+  }
   LColor backgroundColor [] =
     { LColor
         ( 0.392
@@ -334,7 +409,7 @@ int main
   LVecBase2f mouseFocusPoint        = mouseFocusPointInitial;
 
   float sunlightP       = 260;
-  bool  animateSunlight = true;
+  bool  animateSunlight = !capturing;
 
   bool  soundEnabled  = true;
   bool  soundStarted  = false;
@@ -360,7 +435,7 @@ int main
   LVecBase2f normalMapsEnabled          = makeEnabledVec(1);
   LVecBase2f bloomEnabled               = makeEnabledVec(1);
   LVecBase2f sharpenEnabled             = makeEnabledVec(1);
-  LVecBase2f depthOfFieldEnabled        = makeEnabledVec(1);
+  LVecBase2f depthOfFieldEnabled        = makeEnabledVec(capture.depthOfField ? 1 : 0);
   LVecBase2f filmGrainEnabled           = makeEnabledVec(1);
   LVecBase2f flowMapsEnabled            = makeEnabledVec(1);
   LVecBase2f lookupTableEnabled         = makeEnabledVec(1);
@@ -370,18 +445,21 @@ int main
   LVecBase2f pixelizeEnabled            = makeEnabledVec(0);
   LVecBase2f chromaticAberrationEnabled = makeEnabledVec(1);
 
-  LVecBase4 rgba8  = ( 8,  8,  8,  8);
-  LVecBase4 rgba16 = (16, 16, 16, 16);
-  LVecBase4 rgba32 = (32, 32, 32, 32);
+  LVecBase4 rgba8  ( 8,  8,  8,  8);
+  LVecBase4 rgba16 (16, 16, 16, 16);
+  LVecBase4 rgba32 (32, 32, 32, 32);
 
   load_prc_file("panda3d-prc-file.prc");
 
   PT(TextFont) font = FontPool::load_font("fonts/font.ttf");
 
-  std::vector<PT(AudioSound)> sounds =
-    { audioManager->get_sound("sounds/wheel.ogg", true)
-    , audioManager->get_sound("sounds/water.ogg", true)
-    };
+  std::vector<PT(AudioSound)> sounds;
+  if (!capturing) {
+    audioManager = AudioManager::create_AudioManager();
+    sounds = { audioManager->get_sound("sounds/wheel.ogg", true)
+             , audioManager->get_sound("sounds/water.ogg", true)
+             };
+  }
 
   PT(Texture) blankTexture             = TexturePool::load_texture("images/blank.png");
   PT(Texture) foamPatternTexture       = TexturePool::load_texture("images/foam-pattern.png");
@@ -398,16 +476,33 @@ int main
   setTextureToNearestAndClamp(colorLookupTableTexture1);
 
   PandaFramework framework;
+  if (capturing) { argc = 1; }
   framework.open_framework(argc, argv);
   framework.set_window_title("3D Game Shaders For Beginners By David Lettier");
 
-  PT(WindowFramework)         window                = framework.open_window();
-  PT(GraphicsWindow)          graphicsWindow        = window->get_graphics_window();
+  PT(WindowFramework) window;
+  if (capturing) {
+    WindowProperties properties;
+    framework.get_default_window_props(properties);
+    window = framework.open_window(properties,
+      GraphicsPipe::BF_refuse_window | GraphicsPipe::BF_fb_props_optional);
+  } else {
+    window = framework.open_window();
+  }
+  if (!window) {
+    std::cerr << (capturing ? "Cannot open an offscreen graphics output.\n"
+                           : "Cannot open a graphics window.\n");
+    if (audioManager) { audioManager->shutdown(); }
+    framework.close_framework();
+    return 1;
+  }
+  PT(GraphicsWindow)          graphicsWindow;
+  if (!capturing) { graphicsWindow = window->get_graphics_window(); }
   PT(GraphicsOutput)          graphicsOutput        = window->get_graphics_output();
   PT(GraphicsStateGuardian)   graphicsStateGuardian = graphicsOutput->get_gsg();
   PT(GraphicsEngine)          graphicsEngine        = graphicsStateGuardian->get_engine();
 
-  window->enable_keyboard();
+  if (!capturing) { window->enable_keyboard(); }
 
   PT(DisplayRegion) displayRegion3d = window->get_display_region_3d();
   displayRegion3d->set_clear_color_active(true);
@@ -430,7 +525,8 @@ int main
   statusNP.set_scale(0.05);
   statusNP.set_pos(-0.96, 0, -0.95);
 
-  PT(MouseWatcher) mouseWatcher = getMouseWatcher(window);
+  PT(MouseWatcher) mouseWatcher;
+  if (!capturing) { mouseWatcher = getMouseWatcher(window); }
 
   PT(Camera) mainCamera = window->get_camera(0);
   PT(Lens) mainLens = mainCamera->get_lens();
@@ -488,6 +584,7 @@ int main
   squashGeometry(environmentNP);
 
   NodePath smokeNP = setUpParticles(render, smokeTexture);
+  if (!capture.particles) { smokeNP.hide(); }
 
   waterNP.set_transparency(TransparencyAttrib::M_dual);
   waterNP.set_bin("fixed", 0);
@@ -563,7 +660,7 @@ int main
   isSmokeNP.set_shader_input("isParticle", LVecBase2f(1.0, 1.0));
 
   LMatrix4 currentViewWorldMat      = cameraNP.get_transform(render)->get_mat();
-  LMatrix4 previousViewWorldMat     = previousViewWorldMat;
+  LMatrix4 previousViewWorldMat     = currentViewWorldMat;
 
   FramebufferTextureArguments framebufferTextureArguments;
   framebufferTextureArguments.window         = window;
@@ -1287,13 +1384,38 @@ int main
     };
 
   showBufferIndex = bufferArray.size() - 1;
+  if (capturing && capture.buffer != "final") {
+    const auto it = std::find_if(bufferArray.begin(), bufferArray.end(),
+      [&](const std::tuple<std::string, PT(GraphicsOutput), int> &entry) {
+        return std::get<0>(entry) == capture.buffer;
+      });
+    if (it == bufferArray.end()) {
+      std::cerr << "Unknown capture buffer: " << capture.buffer << "\n";
+      for (const auto &entry : bufferArray) {
+        std::cerr << "  " << std::get<0>(entry) << "\n";
+      }
+      framework.close_framework();
+      return 2;
+    }
+    showBufferIndex = it - bufferArray.begin();
+  }
 
   showBuffer
     ( render2d
     , statusNP
     , bufferArray[showBufferIndex]
-    , false
     );
+
+  int captureFramesRun = 0;
+  const double captureFrameStep = 1.0 / 60.0;
+  if (capturing) {
+    statusNP.hide();
+    ClockObject *clock = ClockObject::get_global_clock();
+    clock->set_mode(ClockObject::M_non_real_time);
+    clock->set_dt(captureFrameStep);
+    clock->set_frame_time(0.0);
+    clock->set_frame_count(0);
+  }
 
   shuttersAnimationCollection.play(   "close-shutters"          );
   weatherVaneAnimationCollection.loop("weather-vane-shake", true);
@@ -1307,15 +1429,15 @@ int main
   auto beforeFrame =
     [&]() -> void {
 
-    WindowProperties windowProperties = graphicsWindow->get_properties();
-    if (windowProperties.get_minimized()) {
+    if (graphicsWindow && graphicsWindow->get_properties().get_minimized()) {
       std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
-    now = microsecondsSinceEpoch();
+    if (!capturing) { now = microsecondsSinceEpoch(); }
 
     // Avoids a loud audio pop.
-    if (!soundStarted && microsecondToSecond(now - loopStartedAt) >= startSoundAt) {
+    if (!capturing && !soundStarted &&
+        microsecondToSecond(now - loopStartedAt) >= startSoundAt) {
       for_each
         ( sounds.begin()
         , sounds.end()
@@ -1324,7 +1446,7 @@ int main
       soundStarted = true;
     }
 
-    double delta = microsecondToSecond(now - then);
+    double delta = capturing ? captureFrameStep : microsecondToSecond(now - then);
 
     then = now;
 
@@ -1361,8 +1483,10 @@ int main
     bool arrowLeftDown           = isButtonDown(mouseWatcher, "arrow_left");
     bool arrowRightDown          = isButtonDown(mouseWatcher, "arrow_right");
 
-    bool middayDown              = isButtonDown(mouseWatcher, "1");
-    bool midnightDown            = isButtonDown(mouseWatcher, "2");
+    bool middayDown              = capturing ? captureFramesRun == 0 && capture.preset == "midday"
+                                             : isButtonDown(mouseWatcher, "1");
+    bool midnightDown            = capturing ? captureFramesRun == 0 && capture.preset == "midnight"
+                                             : isButtonDown(mouseWatcher, "2");
     bool fresnelDown             = isButtonDown(mouseWatcher, "3");
     bool rimLightDown            = isButtonDown(mouseWatcher, "4");
     bool particlesDown           = isButtonDown(mouseWatcher, "5");
@@ -1387,9 +1511,9 @@ int main
     bool sunlightDown            = isButtonDown(mouseWatcher, "/");
     bool chromaticAberrationDown = isButtonDown(mouseWatcher, "\\");
 
-    bool mouseLeftDown    = mouseWatcher->is_button_down(MouseButton::one());
-    bool mouseMiddleDown  = mouseWatcher->is_button_down(MouseButton::two());
-    bool mouseRightDown   = mouseWatcher->is_button_down(MouseButton::three());
+    bool mouseLeftDown    = mouseWatcher && mouseWatcher->is_button_down(MouseButton::one());
+    bool mouseMiddleDown  = mouseWatcher && mouseWatcher->is_button_down(MouseButton::two());
+    bool mouseRightDown   = mouseWatcher && mouseWatcher->is_button_down(MouseButton::three());
 
     if (wDown) {
       cameraRotatePhi -= movement * 0.5;
@@ -1437,7 +1561,7 @@ int main
       cameraLeftRightAdjust = -2 * delta;
     }
 
-    if (mouseWatcher->has_mouse()) {
+    if (mouseWatcher && mouseWatcher->has_mouse()) {
       mouseNow[0] = mouseWatcher->get_mouse_x();
       mouseNow[1] = mouseWatcher->get_mouse_y();
 
@@ -1522,17 +1646,10 @@ int main
         }
 
         std::string bufferName = std::get<0>(bufferArray[showBufferIndex]);
-        bool showAlpha =
-              bufferName == "Outline"
-          ||  bufferName == "Foam"
-          ||  bufferName == "Fog"
-          ;
-
         showBuffer
           ( render2d
           , statusNP
           , bufferArray[showBufferIndex]
-          , showAlpha
           );
 
         keyTime = now;
@@ -1975,13 +2092,11 @@ int main
     status->set_shadow_color(statusShadowColor);
     status->set_text(statusText);
 
-    updateAudoManager
-      ( sceneRootNP
-      , cameraNP
-      );
+    if (!capturing) { updateAudoManager(sceneRootNP, cameraNP); }
 
     particleSystemManager.do_particles(delta);
     physicsManager.do_physics(delta);
+    if (capturing) { ++captureFramesRun; }
     };
 
   auto beforeFrameRunner =
@@ -2031,35 +2146,56 @@ int main
     ( new LinearEulerIntegrator()
     );
 
-  LVector3f wheelNPRelPos = wheelNP.get_pos(sceneRootNP);
-  sounds[0]->set_3d_attributes
-    ( wheelNPRelPos[0]
-    , wheelNPRelPos[1]
-    , wheelNPRelPos[2]
-    , 0
-    , 0
-    , 0
-    );
-  LVector3f waterNPRelPos = waterNP.get_pos(sceneRootNP);
-  sounds[1]->set_3d_attributes
-    ( waterNPRelPos[0]
-    , waterNPRelPos[1]
-    , waterNPRelPos[2]
-    , 0
-    , 0
-    , 0
-    );
+  int result = 0;
+  if (capturing) {
+    for (int i = 0; i < capture.frames; ++i) {
+      if (!framework.do_frame(Thread::get_current_thread())) {
+        std::cerr << "Graphics output closed during capture.\n";
+        result = 1;
+        break;
+      }
+    }
+    if (result == 0 && !graphicsOutput->save_screenshot(Filename::from_os_specific(capture.path))) {
+      std::cerr << "Could not save PNG: " << capture.path << "\n";
+      result = 1;
+    }
+    if (result == 0) {
+      std::cout << capture.preset << " / " << capture.buffer << " / "
+                << capture.frames << " frames / " << graphicsOutput->get_x_size()
+                << 'x' << graphicsOutput->get_y_size()
+                << (capture.depthOfField ? "" : " / depth-of-field off")
+                << (capture.particles ? "" : " / particles off")
+                << ": " << capture.path << "\n";
+    }
+  } else {
+    LVector3f wheelNPRelPos = wheelNP.get_pos(sceneRootNP);
+    sounds[0]->set_3d_attributes
+      ( wheelNPRelPos[0]
+      , wheelNPRelPos[1]
+      , wheelNPRelPos[2]
+      , 0
+      , 0
+      , 0
+      );
+    LVector3f waterNPRelPos = waterNP.get_pos(sceneRootNP);
+    sounds[1]->set_3d_attributes
+      ( waterNPRelPos[0]
+      , waterNPRelPos[1]
+      , waterNPRelPos[2]
+      , 0
+      , 0
+      , 0
+      );
 
-  sounds[0]->set_3d_min_distance(60);
-  sounds[1]->set_3d_min_distance(50);
-
-  framework.main_loop();
-
-  audioManager->shutdown();
+    sounds[0]->set_3d_min_distance(60);
+    sounds[1]->set_3d_min_distance(50);
+    framework.main_loop();
+    audioManager->shutdown();
+  }
 
   framework.close_framework();
 
-  return 0;
+  return result;
   }
 
 // END MAIN
@@ -2448,7 +2584,6 @@ void showBuffer
   ( NodePath render2d
   , NodePath statusNP
   , std::tuple<std::string, PT(GraphicsOutput), int> bufferTexture
-  , bool alpha
   ) {
   hideBuffer
     ( render2d
@@ -2463,7 +2598,7 @@ void showBuffer
   nodePath.reparent_to(render2d);
   nodePath.set_y(0);
 
-  if (alpha)
+  if (bufferName == "Outline" || bufferName == "Foam" || bufferName == "Fog")
     nodePath.set_transparency
       ( TransparencyAttrib::Mode::M_alpha
       );
@@ -2493,7 +2628,7 @@ bool isButtonDown
   , std::string character
   ) {
   return
-    mouseWatcher
+    mouseWatcher && mouseWatcher
       ->is_button_down
         ( ButtonRegistry::ptr()->find_button(character)
         );

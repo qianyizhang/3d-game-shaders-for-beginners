@@ -185,7 +185,6 @@ uniform float u_time;
 uniform vec2 u_resolution;
 uniform float u_fogDensity;
 uniform float u_bloomStrength;
-uniform float u_hdr;
 const float NEAR=0.1;
 const float FAR=36.0;
 float linearDepth(float d) {
@@ -495,9 +494,11 @@ export function createRenderer(canvas) {
     before=makeTarget(gl,w,h,floatColor,true);
     after=makeTarget(gl,w,h,floatColor,true);
     const bw=Math.max(1,Math.floor(w/2)), bh=Math.max(1,Math.floor(h/2));
-    bright=makeTarget(gl,bw,bh,floatColor);
-    blurA=makeTarget(gl,bw,bh,floatColor);
-    blurB=makeTarget(gl,bw,bh,floatColor);
+    if(floatColor){
+      bright=makeTarget(gl,bw,bh,true);
+      blurA=makeTarget(gl,bw,bh,true);
+      blurB=makeTarget(gl,bw,bh,true);
+    }
   }
   function sceneTo(target,shading,time,eye,view,proj) {
     gl.bindFramebuffer(gl.FRAMEBUFFER,target.framebuffer);
@@ -541,7 +542,8 @@ export function createRenderer(canvas) {
     const proj=perspective(43*PI/180,width/height,NEAR,FAR);
     sceneTo(before,lesson.beforeShader,time,eye,view,proj);
     sceneTo(after,lesson.shader,time,eye,view,proj);
-    if(lesson.post===3) {
+    const post=!floatColor&&lesson.post===3?0:lesson.post;
+    if(post===3) {
       quadTo(pBright,bright);sampler(pBright,'u_input',0,after.color);gl.drawArrays(gl.TRIANGLES,0,3);
       quadTo(pBlur,blurA);sampler(pBlur,'u_input',0,bright.color);
       uv2(pBlur,'u_step',1/bright.w,0);gl.drawArrays(gl.TRIANGLES,0,3);
@@ -553,12 +555,11 @@ export function createRenderer(canvas) {
     sampler(pCompose,'u_after',1,after.color);
     sampler(pCompose,'u_normals',2,after.normal);
     sampler(pCompose,'u_depth',3,after.depth);
-    sampler(pCompose,'u_bloom',4,blurB.color);
-    uf(pCompose,'u_split',split);ui(pCompose,'u_post',lesson.post);
+    sampler(pCompose,'u_bloom',4,post===3?blurB.color:after.color);
+    uf(pCompose,'u_split',split);ui(pCompose,'u_post',post);
     uf(pCompose,'u_time',time);uv2(pCompose,'u_resolution',width,height);
     uf(pCompose,'u_fogDensity',fogDensity);
     uf(pCompose,'u_bloomStrength',bloomStrength);
-    uf(pCompose,'u_hdr',floatColor?1:0);
     gl.drawArrays(gl.TRIANGLES,0,3);
     gl.bindVertexArray(null);
     const err=gl.getError();
@@ -572,6 +573,8 @@ export function createRenderer(canvas) {
     if(dirty){draw(lastTime);dirty=false;}
     raf=requestAnimationFrame(frame);
   }
+  // Allocate before returning so startup can recover from an incomplete framebuffer.
+  resize();
   // Drag rotates the same geometry in both comparison halves.
   let down=false,prevX=0,prevY=0;
   canvas.addEventListener('pointerdown',e=>{down=true;prevX=e.clientX;prevY=e.clientY;canvas.setPointerCapture(e.pointerId);});

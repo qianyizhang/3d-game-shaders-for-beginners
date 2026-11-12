@@ -5,6 +5,7 @@ An independent, concise, visually coherent modernization of the concepts in [Dav
 **What's included**
 
 - `index.html` — responsive interactive lesson site, with one 3D scene, 17 lesson modes, a before/after split, camera orbit and controls.
+- `demo.html` — the same guide in a generated, standalone page that can open directly from disk. After editing `index.html` or `src/`, run `python3 build_demo.py` from this directory. Use `python3 build_demo.py --check` to check for drift.
 - `src/renderer.js` — original WebGL2 / GLSL ES 3.00 implementation: geometry, MRT, hardware depth, PBR lighting, stylization, multi-pass HDR bloom, final color management.
 - `src/lessons.js` — concise conceptual explanations, pipeline inputs/outputs and code motifs.
 - `src/main.js` — interface and interactions.
@@ -25,7 +26,7 @@ Use a recent browser with WebGL2 enabled. Orbit with a drag, zoom using the mous
 ## Technical boundaries
 
 - The scene is rendered using WebGL2, *not* a framework such as Three.js. It includes procedurally created mesh geometry and independently written shaders.
-- Uses RGBA16F HDR FBOs if `EXT_color_buffer_float` is supported. Falls back to RGBA8 otherwise; **the high-dynamic-range bloom demonstration is not equivalent in fallback mode**.
+- Uses RGBA16F HDR targets when supported. On WebGL2 with RGBA8 targets, the base scene still renders, and the HDR bloom lesson marks the effect unavailable. If WebGL2 cannot start, the clearly labeled Canvas2D preview illustrates effects without running shaders.
 - The PBR implementation includes direct GGX lighting and approximate ambient, **not** IBL, shadows, or production-quality multiple-scattering compensation.
 - `Normal detail` demonstrates procedural normal perturbation, **not** a real tangent-space normal-map asset. The guide includes the actual TBN mapping pattern.
 - `Color grading` is a split-tone demonstration, **not** a 3D LUT implementation.
