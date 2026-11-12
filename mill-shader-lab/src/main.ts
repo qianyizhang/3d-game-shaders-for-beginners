@@ -1,0 +1,419 @@
+import { loadAssets } from "./assets";
+import { GPU } from "./gpu";
+import { MillLab, buffers, defaultEdit, type BufferName } from "./lab";
+import { defaults, type Effect } from "./effects";
+import { effectPanel, firstLesson, lessons, type Control, type Lesson } from "./lessons";
+import { bookmarks, type Bookmark } from "./state";
+
+function byId<T extends HTMLElement = HTMLElement>(key: string): T {
+  const value = document.getElementById(key);
+  if (!value) throw new Error(`Missing UI element: ${key}`);
+  return value as T;
+}
+const canvas = byId<HTMLCanvasElement>("scene");
+const status = byId("status");
+const workbench = byId("workbench");
+const failure = byId("fallback");
+const showFailure = (error: unknown) => {
+  status.textContent = "Live exercises unavailable";
+  byId("failure").textContent = error instanceof Error ? error.message : String(error);
+  workbench.hidden = true;
+  failure.hidden = false;
+};
+byId("retry").onclick = () => location.reload();
+
+async function start() {
+  const params = new URLSearchParams(location.search);
+  const gpu = new GPU(canvas, params.get("gpu"));
+  const assets = await loadAssets(params.get("scene") ?? undefined);
+  const lab = new MillLab(canvas, assets, gpu);
+  const { state } = lab;
+  let dirty = true;
+  let lost = false;
+  let lesson: Lesson = firstLesson;
+  let sweeping = false;
+  let sweepStart = 0;
+  const paint = () => { dirty = true; };
+  const button = (key: string, action: () => void) => { byId<HTMLButtonElement>(key).onclick = action; };
+  const select = <T extends string>(key: string, values: readonly T[], action: (value: T) => void) => {
+    const element = byId<HTMLSelectElement>(key);
+    for (const value of values) element.add(new Option(value, value));
+    element.onchange = () => { const value = values.find(item => item === element.value); if (value) action(value); };
+    return element;
+  };
+  const labelClock = () => { byId("clock").textContent = `Frame ${state.frame} · ${state.time.toFixed(2)} s`; };
+  const labelPlayback = () => { byId("play").textContent = state.playing ? "Pause" : "Play"; };
+  const updateCode = () => {
+    if (!(byId<HTMLDetailsElement>("shader-code").open)) return;
+    const stage = byId<HTMLSelectElement>("shader-stage").value === "vertex" ? "vertex" : "fragment";
+    byId("code").textContent = "#version 300 es\n" + lab.code()[stage];
+  };
+  const updateSide = (side: "A" | "B") => {
+    state.side = side;
+    byId("side-a").setAttribute("aria-pressed", String(side === "A"));
+    byId("side-b").setAttribute("aria-pressed", String(side === "B"));
+    byId("view-label").textContent = `${side} · ${buffer.value}`;
+    updateCode();
+    paint();
+  };
+  const play = () => { state.playing = !state.playing; labelPlayback(); };
+  const sun = byId<HTMLInputElement>("sun");
+  const bend = byId<HTMLInputElement>("bend");
+  const compile = byId("compile");
+  const marker = byId("focus-marker");
+  const point = byId("point");
+
+  const updateSun = (value: number) => {
+    state.sun = value;
+    if (state.props) state.shutterSun = value;
+    sun.value = String(value);
+    byId("sun-value").textContent = `${value}°`;
+    paint();
+  };
+  const bookmark = select("bookmark", Object.keys(bookmarks) as Bookmark[], open);
+  function open(name: Bookmark) {
+    sweeping = false;
+    state.open(name);
+    bookmark.value = name;
+    byId("stage-title").textContent = name;
+    marker.hidden = true;
+    point.hidden = true;
+    updateSun(state.sun);
+    labelPlayback();
+    labelClock();
+  }
+  function inspect(value: BufferName) {
+    lab.selectBuffer(value);
+    buffer.value = value;
+    const [producer, consumer, description] = buffers[value];
+    byId("chain").textContent = `${producer} → ${consumer}`;
+    byId("description").textContent = description;
+    byId("view-label").textContent = `${state.side} · ${value}`;
+    updateCode();
+    paint();
+  }
+  const buffer = byId<HTMLSelectElement>("buffer");
+  const groups: [string, (name: BufferName) => boolean][] = [
+    ["Output", name => /^(Final color|Display linear|Graded linear)$/.test(name)],
+    ["Geometry", name => /^(Albedo|Encoded normals|Raw depth|Linear depth|View position|Water depth)$/.test(name)],
+    ["Water", name => /^(Water (?!depth)|Refraction|Refract|Reflect|Fresnel|Foam|Flow)/.test(name)],
+    ["Lighting and AO", name => /^(Opaque|Forward|Deferred|Shadow|Specular|SSAO)/.test(name)],
+    ["Focus and motion", name => /^(Focus|Blurred|Dilated|Depth of field|Motion)/.test(name)],
+    ["Image effects", () => true],
+  ];
+  const names = Object.keys(buffers) as BufferName[];
+  const assigned = new Set<BufferName>();
+  for (const [title, contains] of groups) {
+    const group = document.createElement("optgroup");
+    group.label = title;
+    for (const name of names) if (!assigned.has(name) && contains(name)) {
+      assigned.add(name);
+      group.append(new Option(name, name));
+    }
+    buffer.add(group);
+  }
+  buffer.onchange = () => { const name = names.find(value => value === buffer.value); if (name) inspect(name); };
+  byId<HTMLDetailsElement>("shader-code").ontoggle = updateCode;
+  byId<HTMLSelectElement>("shader-stage").onchange = updateCode;
+
+  const toggles = ["flow", "wheel", "props"] as const;
+  for (const key of toggles) {
+    const control = byId<HTMLInputElement>(key);
+    control.onchange = () => { state[key] = control.checked; if (key === "props" && control.checked) state.shutterSun = state.sun; paint(); };
+  }
+  const legacyLink = byId<HTMLInputElement>("legacy-link");
+  legacyLink.onchange = () => { state.legacyLink = legacyLink.checked; };
+  sun.oninput = () => updateSun(sun.valueAsNumber);
+
+  const syncers = new Map<Effect, Set<() => void>>();
+  function controlRow(def: Control, prefix: string) {
+    const key = def.key;
+    const label = document.createElement("label");
+    let refresh: () => void;
+    const edit = (value: number) => {
+      state.effects[key] = value;
+      state.playing = false;
+      labelPlayback();
+      for (const sync of syncers.get(key) ?? []) sync();
+      updateSide("B");
+    };
+    if ("choices" in def) {
+      label.className = "stack";
+      const el = document.createElement("select");
+      el.id = prefix + key;
+      def.choices.forEach((item, i) => {
+        const opt = new Option(item, String(i));
+        if (key === "bloom" && i === 2 && !gpu.hdr) { opt.disabled = true; opt.textContent += " (float targets unavailable)"; }
+        el.add(opt);
+      });
+      el.onchange = () => edit(Number(el.value));
+      label.append(def.label, el);
+      refresh = () => { el.value = String(state.effects[key]); };
+    } else if ("min" in def) {
+      label.className = "slider";
+      const el = document.createElement("input");
+      el.type = "range";
+      el.id = prefix + key;
+      el.min = String(def.min); el.max = String(def.max); el.step = String(def.step);
+      const readout = document.createElement("output");
+      readout.htmlFor = el.id;
+      label.append(def.label, readout, el);
+      el.oninput = () => edit(el.valueAsNumber);
+      refresh = () => { el.value = String(state.effects[key]); readout.textContent = state.effects[key].toFixed(def.digits ?? 0); };
+    } else {
+      const el = document.createElement("input");
+      el.type = "checkbox"; el.id = prefix + key;
+      label.className = "toggle";
+      el.onchange = () => edit(Number(el.checked));
+      label.append(el, def.label);
+      refresh = () => { el.checked = !!state.effects[key]; };
+    }
+    const set = syncers.get(key) ?? new Set();
+    set.add(refresh);
+    syncers.set(key, set);
+    refresh();
+    return { label, detach: () => set.delete(refresh) };
+  }
+  for (const def of effectPanel) byId("effect-list").append(controlRow(def, "fx-").label);
+  const lessonSelect = byId<HTMLSelectElement>("lesson");
+  const lessonGroups = new Map<string, HTMLOptGroupElement>();
+  for (const entry of lessons) {
+    let group = lessonGroups.get(entry.group);
+    if (!group) {
+      group = document.createElement("optgroup"); group.label = entry.group; lessonSelect.add(group);
+      lessonGroups.set(entry.group, group);
+    }
+    group.append(new Option(entry.title, entry.id));
+  }
+  lessonSelect.onchange = () => {
+    const selected = lessons.find(entry => entry.id === lessonSelect.value);
+    if (selected) openLesson(selected);
+  };
+  let detachControls: (() => void)[] = [];
+  function action(label: string, callback: () => void) {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = label; b.onclick = callback;
+    return b;
+  }
+  function syncEffects() {
+    for (const set of syncers.values()) for (const sync of set) sync();
+    for (const key of toggles) byId<HTMLInputElement>(key).checked = state[key];
+    legacyLink.checked = state.legacyLink;
+  }
+  function openLesson(next: Lesson) {
+    lesson = next;
+    lessonSelect.value = next.id;
+    byId("lesson-title").textContent = next.title;
+    byId("lesson-task").textContent = next.task;
+    byId("compare-caption").textContent = next.comparison;
+    state.effects = { ...defaults, ...next.initial };
+    if (!gpu.hdr && state.effects.bloom === 2) state.effects.bloom = 1;
+    state.baseline = { ...next.reference };
+    state.flow = state.wheel = state.props = state.legacyLink = true;
+    lab.resetEdit();
+    bend.value = defaultEdit;
+    compile.textContent = "";
+    byId("editor").hidden = next.action !== "edit";
+    byId<HTMLButtonElement>("pin-a").disabled = !next.controls?.length;
+    detachControls.forEach(detach => detach());
+    const rows = (next.controls ?? []).map(def => controlRow(def, ""));
+    detachControls = rows.map(row => row.detach);
+    byId("lesson-controls").replaceChildren(...rows.map(row => row.label));
+    byId("lesson-views").replaceChildren(...next.views.map(view => action(view, () => inspect(view))));
+    const actions = byId("lesson-actions");
+    actions.replaceChildren();
+    if (next.action === "focus") actions.append(action("Focus dock", () => focusWorld([2.1, 2.3, -4.2])),
+      action("Focus mill", () => focusWorld([2.0, 6.1, -1.6])));
+    if (next.action === "reflect") actions.append(action("Aim down at water", () => {
+      const eye = lab.camera.position.clone();
+      state.target.set(1.1, 0.65, 6.0);
+      state.orbit.setFromVector3(eye.sub(state.target));
+      paint();
+    }), action("Restore pond view", () => open("Across the pond")));
+    if (next.action === "sweep") {
+      actions.append(action("Replay sweep", () => {
+        state.playing = false; labelPlayback(); state.sweepFrame = 0;
+        sweeping = true; sweepStart = performance.now(); paint();
+      }), action("Hold sweep frame", () => {
+        sweeping = false; state.sweepFrame = state.sweepFrame && state.sweepFrame > 0 ? state.sweepFrame : 16; paint();
+      }), action("Stopped camera", () => { stopSweep(); paint(); }));
+    }
+    syncEffects();
+    open(next.scene);
+    inspect("Final color");
+    updateSide("B");
+  }
+  button("pin-a", () => {
+    const keys = new Set<Effect>([...Object.keys(lesson.reference) as Effect[], ...(lesson.controls ?? []).map(def => def.key)]);
+    state.baseline = Object.fromEntries([...keys].map(key => [key, state.effects[key]]));
+    byId("compare-caption").textContent = "A holds these lesson controls at the pinned values. Both sides share the camera, clock and other effects.";
+    state.playing = false; labelPlayback(); updateSide("B");
+  });
+  button("legacy", () => {
+    state.useLegacy(); syncEffects();
+    open("Overview"); updateSide("B"); inspect("Final color");
+  });
+  const sound = byId<HTMLInputElement>("sound");
+  sound.onchange = () => {
+    byId("audio-status").textContent = "";
+    void lab.sound(sound.checked).catch(error => {
+      sound.checked = false;
+      byId("audio-status").textContent = `Sound could not start: ${String(error)}`;
+    });
+  };
+
+  button("midday", () => updateSun(270));
+  button("midnight", () => updateSun(90));
+  button("play", play);
+  button("step", () => {
+    state.playing = false; labelPlayback(); state.step(1 / 60); labelClock(); paint();
+  });
+  button("overview", () => open("Overview"));
+  button("side-a", () => { state.playing = false; sweeping = false; labelPlayback(); updateSide("A"); });
+  button("side-b", () => { state.playing = false; sweeping = false; labelPlayback(); updateSide("B"); });
+  button("apply", () => {
+    try {
+      lab.edit(bend.value);
+      compile.dataset.error = "false";
+      compile.textContent = "Compiled. The new expression is active in B.";
+      state.playing = false; labelPlayback(); updateSide("B");
+    } catch (error) {
+      compile.dataset.error = "true";
+      compile.textContent = `Last working shader kept.\n${error instanceof Error ? error.message : String(error)}`;
+    }
+  });
+  button("reset", () => openLesson(lesson));
+
+  const zoom = (factor: number) => {
+    const limits = state.bookmark === "Overview" || state.bookmark === "Camera sweep" ? [190, 1940] : [2, 45];
+    state.orbit.radius = Math.max(limits[0]!, Math.min(limits[1]!, state.orbit.radius * factor));
+    paint();
+  };
+  button("zoom-in", () => zoom(0.86)); button("zoom-out", () => zoom(1 / 0.86));
+  let panMode = false;
+  button("drag-mode", () => {
+    panMode = !panMode;
+    byId("drag-mode").textContent = panMode ? "Drag: Pan" : "Drag: Orbit";
+  });
+  const move = (dx: number, dy: number, pan: boolean) => {
+    if (pan) {
+      const span = 2 * state.orbit.radius * Math.tan(lab.camera.fov * Math.PI / 360);
+      const scale = span / Math.max(1, canvas.clientHeight);
+      const e = lab.camera.matrixWorld.elements;
+      state.target.x += (-dx * e[0]! + dy * e[4]!) * scale;
+      state.target.y += (-dx * e[1]! + dy * e[5]!) * scale;
+      state.target.z += (-dx * e[2]! + dy * e[6]!) * scale;
+    } else {
+      state.orbit.theta -= dx * 0.006;
+      state.orbit.phi = Math.max(0.08, Math.min(3.02, state.orbit.phi - dy * 0.006));
+    }
+    paint();
+  };
+  const pick = (x: number, y: number) => {
+    const value = lab.pick(x, y);
+    if (!value) { point.hidden = false; point.textContent = "No opaque surface at this point."; return; }
+    marker.hidden = false;
+    marker.style.left = `${x * 100}%`; marker.style.top = `${(1 - y) * 100}%`;
+    const xyz = (vector: { toArray(): number[] }) => vector.toArray().map(n => n.toFixed(2)).join(", ");
+    point.hidden = false;
+    point.textContent = `${value.object}: Object (${xyz(value.local)}) → World (${xyz(value.world)}) → View (${xyz(value.view)}) → Screen UV (${x.toFixed(2)}, ${y.toFixed(2)})`;
+    paint();
+  };
+  function focusWorld(world: [number, number, number]) {
+    const uv = lab.project(world);
+    if (uv) pick(...uv);
+    else { point.hidden = false; point.textContent = "That focus target is outside the current view. Reset the exercise or pick a visible surface."; }
+  }
+  const pointers = new Map<number, { x: number; y: number }>();
+  let travel = 0;
+  let pinched = false;
+  canvas.onpointerdown = event => {
+    if (event.button !== 0 && event.button !== 1) return;
+    if (!pointers.size) { travel = 0; pinched = false; }
+    canvas.setPointerCapture(event.pointerId);
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointers.size > 1) pinched = true;
+  };
+  canvas.onpointermove = event => {
+    const previous = pointers.get(event.pointerId);
+    if (!previous) return;
+    const dx = event.clientX - previous.x, dy = event.clientY - previous.y;
+    travel += Math.abs(dx) + Math.abs(dy);
+    const second = [...pointers.entries()].find(([id]) => id !== event.pointerId)?.[1];
+    if (second) {
+      const before = Math.hypot(previous.x - second.x, previous.y - second.y);
+      const after = Math.hypot(event.clientX - second.x, event.clientY - second.y);
+      if (before > 5 && after > 5) zoom(before / after);
+    } else if (travel > 3) move(dx, dy, panMode || event.shiftKey || event.buttons === 4);
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  };
+  canvas.onpointerup = event => {
+    if (pointers.has(event.pointerId) && !pinched && travel <= 3) {
+      const rect = canvas.getBoundingClientRect();
+      pick((event.clientX - rect.left) / rect.width, 1 - (event.clientY - rect.top) / rect.height);
+    }
+    pointers.delete(event.pointerId);
+  };
+  canvas.onlostpointercapture = event => { pointers.delete(event.pointerId); };
+  canvas.addEventListener("wheel", event => {
+    event.preventDefault();
+    zoom(Math.exp(Math.max(-140, Math.min(140, event.deltaY)) * 0.002));
+  }, { passive: false });
+  canvas.onkeydown = event => {
+    const delta: Record<string, [number, number]> = {
+      ArrowLeft: [-14, 0], ArrowRight: [14, 0], ArrowUp: [0, -14], ArrowDown: [0, 14],
+    };
+    const pair = delta[event.key];
+    if (pair) move(...pair, event.shiftKey || panMode);
+    else if (event.key === "+" || event.key === "=") zoom(0.86);
+    else if (event.key === "-") zoom(1 / 0.86);
+    else if (event.key === "Enter") pick(0.5, 0.5);
+    else if (event.key === " ") play();
+    else return;
+    event.preventDefault();
+  };
+
+  status.textContent = `${lab.name} · WebGL 2 · ${gpu.hdr ? "Float targets available" : "SDR targets"}`;
+  openLesson(lesson);
+  workbench.hidden = false;
+  new ResizeObserver(paint).observe(canvas);
+  canvas.addEventListener("webglcontextlost", () => {
+    lost = true;
+    void lab.sound(false);
+    showFailure(new Error("The browser lost its GPU context. Retry to reload the scene."));
+  });
+  function stopSweep() {
+    sweeping = false;
+    if (state.sweepFrame !== null) state.sweepOffset = state.sweepFrame * 0.008;
+    state.sweepFrame = null;
+  }
+  let last = performance.now();
+  function frame(now: number) {
+    if (lost) return;
+    try {
+      if (sweeping) {
+        const step = Math.floor((now - sweepStart) / 42);
+        if (step < 48) state.sweepFrame = step;
+        else { stopSweep(); }
+        dirty = true;
+      }
+      if (state.playing) {
+        state.step(Math.max(0, Math.min(0.05, (now - last) / 1000)));
+        labelClock();
+        dirty = true;
+      }
+      if (dirty) {
+        dirty = false;
+        lab.render(canvas.clientWidth, canvas.clientHeight);
+      }
+    } catch (error) {
+      showFailure(error);
+      return;
+    }
+    last = now;
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+void start().catch(showFailure);

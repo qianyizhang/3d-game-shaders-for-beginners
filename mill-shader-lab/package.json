@@ -1,0 +1,23 @@
+{
+  "name": "mill-shader-lab",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "check": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "npm run build && node test/full.mjs",
+    "capture:parity": "npm run build && node test/parity.mjs"
+  },
+  "dependencies": {
+    "three": "0.187.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "@types/three": "0.187.0",
+    "playwright-core": "1.61.1",
+    "typescript": "7.0.2",
+    "vite": "8.3.8"
+  }
+}

@@ -1,0 +1,61 @@
+import assert from "node:assert/strict";
+import { pixelStats, samePixels } from "./pixels.mjs";
+
+export async function waterline({ $, page, check, open, reveal, shot, side, stable, view }) {
+  await open("refraction");
+  const stock = await shot();
+  const clock = await $("clock").textContent();
+  await $("rior").focus();
+  await $("rior").press("ArrowLeft");
+  assert.equal(await $("rior").inputValue(), "1.045", "The index must respond to the keyboard");
+  for (let i = 1; i < 23; ++i) await $("rior").press("ArrowLeft");
+  const experiment = await shot();
+  await side("a");
+  await samePixels(page, stock, await shot(), "A keeps the stock index and scene");
+  assert.equal(await $("clock").textContent(), clock);
+  const mask = await view("Water mask");
+  const hit = await view("Refraction hit UV");
+  const transmission = await pixelStats(page, hit);
+  assert.ok(transmission.hits > 1000 && transmission.misses > 100, JSON.stringify(transmission));
+  const ab = await pixelStats(page, stock, experiment, { mask });
+  assert.ok(ab.inside > 2000 && ab.count > 500 && ab.outsideChanges < 20, JSON.stringify(ab));
+
+  await view("Final color");
+  await reveal("editor");
+  await $("bend").fill("2.0");
+  await $("apply").click();
+  const edited = await shot();
+  assert.match(await $("compile").textContent(), /Compiled/);
+  const edit = await pixelStats(page, experiment, edited, { mask });
+  assert.ok(edit.count > 300 && edit.outsideChanges < 20, JSON.stringify(edit));
+  await $("bend").fill("notAFloat");
+  await $("apply").click();
+  assert.match(await $("compile").textContent(), /Last working shader kept.[\s\S]*notAFloat/);
+  await samePixels(page, edited, await shot(), "Rejected edit preserves the last working render");
+  await $("reset").click();
+  await samePixels(page, stock, await shot(), "Reset restores the stock render");
+  const missUV = await view("Refraction hit UV");
+  const { misses } = await pixelStats(page, missUV);
+  await view("Final color");
+  await reveal("scene-effects");
+  await check("fx-refraction", false);
+  const fallback = await pixelStats(page, stock, await shot(), { mask: missUV, threshold: 0 });
+  assert.ok(misses > 200 && fallback.missChanges === 0, JSON.stringify({ misses, fallback }));
+
+  await check("flow", false);
+  await check("props", false);
+  const stopped = await view("Opaque color");
+  await $("step").click();
+  await samePixels(page, stopped, await shot(), "The wheel stays still with linked flow disabled");
+  await check("flow", true);
+  for (let i = 0; i < 5; i++) await $("step").click();
+  assert.ok((await pixelStats(page, stopped, await shot())).count > 100, "Linked flow advances the wheel");
+  const beforePlay = await $("clock").textContent();
+  await $("play").click();
+  await page.waitForFunction(clock => document.querySelector("#clock").textContent !== clock, beforePlay);
+  await $("play").click();
+  const paused = await $("clock").textContent();
+  await stable();
+  assert.equal(await $("clock").textContent(), paused, "Pause holds the scene clock");
+  console.log(`Waterline: ${ab.count} changed pixels, ${ab.outsideChanges} outside the mask; ${misses} undistorted misses; edit, recovery and linked wheel passed`);
+}

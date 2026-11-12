@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mill Shader Lab</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/src/lab.css">
+</head>
+<body>
+  <a class="skip" href="#practice">Skip to practice</a>
+  <header class="mast">
+    <div class="identity"><span class="mark" aria-hidden="true">◈</span><h1>Mill Shader Lab</h1></div>
+    <a href="https://lettier.github.io/3d-game-shaders-for-beginners/index.html">Original tutorial ↗</a>
+  </header>
+  <main>
+    <p class="status" id="status" role="status">Loading the local mill…</p>
+    <section id="fallback" hidden>
+      <h2>The live lab is unavailable</h2>
+      <p id="failure"></p>
+      <details><summary>Set up the local scene</summary>
+        <p>From the checkout root, install Panda3D 1.10.16 in a Python 3.12 virtual environment and run <code>python mill-shader-lab/tools/convert_mill.py</code>. Then run <code>npm ci</code> and <code>npm run dev</code> in <code>mill-shader-lab/</code>, and open the local address.</p>
+        <p>The lab needs a browser with WebGL 2 enabled. Open the original tutorial above to read the source lessons.</p>
+      </details>
+      <button type="button" id="retry">Retry</button>
+    </section>
+    <div class="workbench" id="workbench" hidden>
+      <section class="stage" aria-labelledby="stage-title">
+        <div class="stage-head">
+          <div><p class="eyebrow">LIVE SCENE</p><h2 id="stage-title">Waterline</h2></div>
+          <label>Scene setting <select id="bookmark"></select></label>
+        </div>
+        <div class="viewport">
+          <canvas id="scene" tabindex="0" aria-label="Mill scene" aria-describedby="camera-help"></canvas>
+          <div id="focus-marker" aria-hidden="true" hidden></div>
+          <span class="viewport-tag" id="view-label">B · Final color</span>
+        </div>
+        <div class="toolbar" aria-label="Scene controls">
+          <button type="button" id="play">Play</button>
+          <button type="button" id="step">Step frame</button>
+          <output id="clock" aria-label="Scene frame"></output>
+          <div class="grow"></div>
+          <button type="button" id="drag-mode">Drag: Orbit</button>
+          <button type="button" id="zoom-in" aria-label="Zoom in">+</button>
+          <button type="button" id="zoom-out" aria-label="Zoom out">−</button>
+          <button type="button" id="overview">Overview</button>
+        </div>
+        <p class="help" id="camera-help">Drag or use arrow keys to orbit. Pan with Shift + arrows or change the drag mode. Click or press Enter to pick focus.</p>
+        <output id="point" role="status" class="point" hidden></output>
+      </section>
+      <aside class="rail">
+        <section class="panel" id="practice" aria-labelledby="lesson-title">
+          <p class="eyebrow">PRACTICE</p>
+          <label class="stack">Lesson <select id="lesson"></select></label>
+          <h2 id="lesson-title">Screen-space refraction</h2>
+          <p id="lesson-task"></p>
+          <div class="compare" aria-label="Matched comparison">
+            <button type="button" id="side-a" aria-pressed="false">A · Reference</button>
+            <button type="button" id="side-b" aria-pressed="true">B · Experiment</button>
+          </div>
+          <p class="help" id="compare-caption"></p>
+          <div id="lesson-controls"></div>
+          <div class="toolbar" id="lesson-views" aria-label="Lesson buffers"></div>
+          <div class="toolbar" id="lesson-actions" aria-label="Lesson actions"></div>
+          <details id="editor">
+            <summary>Edit the live shader</summary>
+            <p class="help">Change how strongly the ray bends. Try <code>2.0</code>, then try an unknown variable.</p>
+            <label for="bend">GLSL float expression</label>
+            <div class="edit-line"><code>mix(incident, bent,</code><input id="bend" value="1.0" autocomplete="off" spellcheck="false"><code>)</code></div>
+            <button type="button" id="apply">Compile &amp; apply</button>
+            <pre id="compile" role="status"></pre>
+          </details>
+          <div class="toolbar"><button type="button" class="quiet" id="reset">Reset exercise</button>
+          <button type="button" class="quiet" id="pin-a">Pin controls as A</button></div>
+        </section>
+        <section class="panel" id="inspector" aria-labelledby="inspect-title">
+          <p class="eyebrow">GPU BUFFERS</p>
+          <h2 id="inspect-title">Inspect</h2>
+          <label for="buffer">View</label>
+          <select id="buffer"></select>
+          <p class="chain" id="chain"></p>
+          <p class="help" id="description"></p>
+          <details id="shader-code"><summary>Pass shader source</summary><label for="shader-stage">Stage</label>
+            <select id="shader-stage"><option value="fragment">Fragment</option><option value="vertex">Vertex</option></select>
+            <pre id="code" tabindex="0"></pre>
+          </details>
+        </section>
+        <details class="panel" id="scene-effects"><summary>Scene &amp; effects</summary>
+          <div class="toolbar"><button type="button" id="midday">Midday</button><button type="button" id="midnight">Midnight</button></div>
+          <label class="slider">Sun pitch <output id="sun-value" for="sun">270°</output><input type="range" min="0" max="360" step="1" value="270" id="sun"></label>
+          <div id="toggles">
+            <label class="toggle"><input type="checkbox" id="flow" checked> Flow map</label>
+            <label class="toggle"><input type="checkbox" id="wheel" checked> Wheel</label>
+            <label class="toggle"><input type="checkbox" id="props" checked> Moving props</label>
+            <label class="toggle"><input type="checkbox" id="legacy-link" checked> Link wheel to flow</label>
+            <label class="toggle"><input type="checkbox" id="sound"> Sound</label>
+          </div>
+          <button type="button" id="legacy">Load Legacy preset</button>
+          <div id="effect-list"></div>
+          <p id="audio-status" class="help" role="status"></p>
+        </details>
+      </aside>
+    </div>
+  </main>
+  <footer>Local learning lab · Original mill scene by David Lettier · <a href="https://lettier.github.io/3d-game-shaders-for-beginners/index.html">33 source sections</a></footer>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
