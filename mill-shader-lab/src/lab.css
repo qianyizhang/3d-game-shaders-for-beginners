@@ -97,6 +97,10 @@ pre:empty { display: none; }
 #lesson-views, #lesson-actions { margin-top: 0; }
 #lesson-views:empty, #lesson-actions:empty { display: none; }
 #lesson-views button { font-size: .78rem; }
+#pose-controls { display: grid; gap: .35rem; }
+#pose-controls .toolbar { margin: 0; }
+#pose-edit { display: grid; gap: .3rem; }
+#pose-edit select { width: 100%; }
 #effect-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .35rem; margin-block-start: .65rem; }
 #effect-list select { width: 100%; }
 #effect-list label { font-size: .83rem; }

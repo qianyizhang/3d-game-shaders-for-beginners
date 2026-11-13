@@ -1,0 +1,293 @@
+{
+  "weather-station": {
+    "subject": "the striped gauge",
+    "shots": [
+      {
+        "slug": "overview",
+        "title": "Quay and station",
+        "description": "A three-quarter view of the roof, waterfront and full gauge.",
+        "target": [
+          -0.8,
+          1.75,
+          -1.72
+        ],
+        "offset": [
+          5.6,
+          3.5,
+          10.9
+        ],
+        "fov": 44,
+        "near": 0.12,
+        "far": 85,
+        "sun": 238
+      },
+      {
+        "slug": "waterline",
+        "title": "Gauge and bed",
+        "description": "The orange and cream scale crosses the canal surface beside the dock.",
+        "target": [
+          1.03,
+          0.03,
+          0.42
+        ],
+        "offset": [
+          3.0,
+          3.2,
+          6.14
+        ],
+        "fov": 40,
+        "near": 0.12,
+        "far": 85,
+        "sun": 238
+      },
+      {
+        "slug": "night",
+        "title": "Beacon at blue hour",
+        "description": "A close view of the window and amber beacon against the dark wall.",
+        "target": [
+          -0.43,
+          2.26,
+          -1.74
+        ],
+        "offset": [
+          2.9,
+          1.12,
+          6.9
+        ],
+        "fov": 40,
+        "near": 0.12,
+        "far": 85,
+        "sun": 110
+      }
+    ]
+  },
+  "ferry-landing": {
+    "subject": "the marked bamboo pole",
+    "shots": [
+      {
+        "slug": "overview",
+        "title": "Pavilion and covered ferry",
+        "description": "A curved roof, landing lantern, autumn branches and marked pole share the river approach.",
+        "target": [
+          -0.68,
+          1.27,
+          -0.48
+        ],
+        "offset": [
+          4.0,
+          3.4,
+          11.9
+        ],
+        "fov": 48,
+        "near": 0.12,
+        "far": 85,
+        "sun": 238
+      },
+      {
+        "slug": "waterline",
+        "title": "Bamboo pole and paving",
+        "description": "The close camera follows the marked pole through the basin surface beside the ferry hull.",
+        "target": [
+          2.84,
+          0.25,
+          2.79
+        ],
+        "offset": [
+          1.65,
+          2.65,
+          5.92
+        ],
+        "fov": 41,
+        "near": 0.12,
+        "far": 85,
+        "sun": 238
+      },
+      {
+        "slug": "night",
+        "title": "Lantern at the landing",
+        "description": "The paper lantern and recessed pavilion panes glow over the dark basin.",
+        "target": [
+          -0.49,
+          1.56,
+          -0.26
+        ],
+        "offset": [
+          3.14,
+          1.6,
+          8.02
+        ],
+        "fov": 44,
+        "near": 0.12,
+        "far": 85,
+        "sun": 117
+      }
+    ]
+  },
+  "glasshouse": {
+    "subject": "the broad leaf's stem",
+    "shots": [
+      {
+        "slug": "overview",
+        "title": "Conservatory overview",
+        "description": "Iron ribs and tall glazing bays open over a patterned koi pond.",
+        "target": [
+          0.48,
+          1.6,
+          -0.32
+        ],
+        "offset": [
+          4.75,
+          3.86,
+          8.9
+        ],
+        "fov": 43,
+        "near": 0.12,
+        "far": 85,
+        "sun": 247
+      },
+      {
+        "slug": "waterline",
+        "title": "Koi and stem",
+        "description": "Both koi stay submerged; the stem provides a dry and wet reference.",
+        "target": [
+          0.42,
+          0.09,
+          1.4
+        ],
+        "offset": [
+          1.55,
+          2.65,
+          5.09
+        ],
+        "fov": 44,
+        "near": 0.12,
+        "far": 85,
+        "sun": 247
+      }
+    ]
+  },
+  "night-market": {
+    "subject": "the striped iron drain grate",
+    "shots": [
+      {
+        "slug": "overview",
+        "title": "Night repair shop",
+        "description": "Magenta sign and amber work light lead into the tiled drain.",
+        "target": [
+          0.48,
+          1.63,
+          -0.12
+        ],
+        "offset": [
+          4.72,
+          3.38,
+          8.85
+        ],
+        "fov": 40,
+        "near": 0.12,
+        "far": 85,
+        "sun": 96
+      },
+      {
+        "slug": "waterline",
+        "title": "Drain grate",
+        "description": "The striped grate provides a comparison through the water.",
+        "target": [
+          0.64,
+          0.06,
+          1.47
+        ],
+        "offset": [
+          2.22,
+          2.58,
+          4.5
+        ],
+        "fov": 44,
+        "near": 0.12,
+        "far": 85,
+        "sun": 248
+      },
+      {
+        "slug": "day",
+        "title": "Daylight materials",
+        "description": "A matching daylight view reveals the shutter, awning, tools and stone.",
+        "target": [
+          0.48,
+          1.63,
+          -0.12
+        ],
+        "offset": [
+          4.72,
+          3.38,
+          8.85
+        ],
+        "fov": 40,
+        "near": 0.12,
+        "far": 85,
+        "sun": 248
+      }
+    ]
+  },
+  "puppet-yard": {
+    "subject": "the dragon’s banded tail",
+    "shots": [
+      {
+        "slug": "overview",
+        "title": "Workshop and pool",
+        "description": "The painted curtain, dragon and tiled pool in one frame.",
+        "target": [
+          -0.36,
+          1.27,
+          0.11
+        ],
+        "offset": [
+          5.1,
+          3.85,
+          9.4
+        ],
+        "fov": 46,
+        "near": 0.12,
+        "far": 85,
+        "sun": 248
+      },
+      {
+        "slug": "waterline",
+        "title": "Tail at the waterline",
+        "description": "Follow the brass bands as the tail bends below the surface.",
+        "target": [
+          0.13,
+          0.2,
+          0.69
+        ],
+        "offset": [
+          1.75,
+          2.45,
+          5.8
+        ],
+        "fov": 49,
+        "near": 0.12,
+        "far": 85,
+        "sun": 248
+      },
+      {
+        "slug": "lamp",
+        "title": "After hours",
+        "description": "A warm task lamp against the dim red curtain.",
+        "target": [
+          -1.97,
+          1.75,
+          -1.1
+        ],
+        "offset": [
+          3.6,
+          1.48,
+          5.1
+        ],
+        "fov": 45,
+        "near": 0.12,
+        "far": 85,
+        "sun": 90
+      }
+    ]
+  }
+}

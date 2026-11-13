@@ -50,9 +50,11 @@ single scene, the baseline is five main shots plus a smoke close-up:
 | Night source | One bright region stands apart from a dim surface and gives bloom a visible source. |
 | Smoke source | One small vent or vessel against a legible background; frame the outlet and plume together. |
 
-These are targets for the [19 exercises in the research baseline](../../mill-shader-lab/src/lessons.ts).
-The BOM also reserves a simple emitter mesh and shot for the sprite/volume
-smoke comparison reviewed separately in the working tree.
+These are targets for the 19 exercises in the research baseline. The
+[current lab](../../mill-shader-lab/src/lessons.ts) has 20 shared lessons, including
+the sprite/volume chimney comparison. The [five scene kits](../scene-gallery.md)
+now stage all 20, using a flue or vessel for smoke. The glasshouse and puppet
+yard also offer a joint posing lesson.
 The images establish composition, palette and material contrasts. They do
 not specify meshes, UVs, rigging, or a repeatable camera. Aim to match what
 reads in each frame: the silhouette, color relationships, waterline and light.
@@ -69,18 +71,15 @@ marker. A normal map can carry scratches and grain.
 
 ## Separate renderer work
 
-The [current loader](../../mill-shader-lab/src/assets.ts) consumes the lab's
-own v1 JSON and binary format. A served `?scene=` manifest selects a file;
-it does not import GLB, reframe cameras, or infer which parts make water,
-shadows or glow. The [bookmarks](../../mill-shader-lab/src/bookmarks.json),
-[focus targets](../../mill-shader-lab/src/main.ts),
-[window glow](../../mill-shader-lab/src/shaders/lighting.glsl), and
-[swatch, light bounds, prop clips and axle](../../mill-shader-lab/src/lab.ts)
-and [chimney origin](../../mill-shader-lab/src/shaders/atmosphere.frag) are
-tied to the mill. The loader also requires six mesh roles and resource slots
-for props and effects even if a concept leaves them out. For a prototype,
-map to the existing roles; for a lasting replacement, make decorative roles
-optional and move scene anchors into scene data.
+The [current loader](../../mill-shader-lab/src/assets.ts) consumes v1 JSON and
+binary data. A served `?scene=` manifest selects a file. The mill profile
+requires six mesh roles. The alternate profile requires opaque and water
+meshes and supplies its entry camera and Waterline subject. The current kits
+provide `practice` data for the eight lesson cameras, focus points, swatch,
+smoke source and reflection aim. The mill retains its own bookmarks and
+animation roles. Both profiles support authored night glow anchors; the koi
+and puppet use optional joint data. The lab does not import GLB or infer
+the roles of meshes.
 The [water pass](../../mill-shader-lab/src/shaders/water-geometry.frag)
 needs a separate water surface, its own mask slots, and a flow map.
 The opaque [shader](../../mill-shader-lab/src/shaders/opaque.frag) samples

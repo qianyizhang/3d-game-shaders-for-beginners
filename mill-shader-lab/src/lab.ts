@@ -1,11 +1,11 @@
 import {
-  DoubleSide, DynamicDrawUsage, MathUtils, Matrix4, Mesh, OrthographicCamera, PerspectiveCamera, SphereGeometry, Raycaster, Scene,
-  Vector2, Vector3, type Texture, type RawShaderMaterial,
+  DoubleSide, DynamicDrawUsage, Group, MathUtils, Matrix4, Mesh, OrthographicCamera, PerspectiveCamera, SphereGeometry, Raycaster, Scene,
+  Vector2, Vector3, Vector4, type Texture, type RawShaderMaterial,
 } from "three";
 import { Post, isPostBuffer, postBuffers } from "./post";
 import type { MeshAsset, SceneAssets } from "./assets";
 import { GPU, material, source, u, type Uniforms } from "./gpu";
-import { bookmarks, LabState, legacy } from "./state";
+import { LabState, legacy } from "./state";
 import vertex from "./shaders/geometry.vert?raw";
 import opaque from "./shaders/opaque.frag?raw";
 import water from "./shaders/water-geometry.frag?raw";
@@ -52,16 +52,18 @@ export const buffers = {
 export type BufferName = keyof typeof buffers;
 
 type Part = { asset: MeshAsset; mesh: Mesh; shader: RawShaderMaterial; shadow: RawShaderMaterial; previousFrame: Float32Array | undefined };
+type RevoluteJoint = { node: Group; axis: Vector3; amplitude: number; phase: number; speed: number; rest: number };
 
 export class MillLab {
-  readonly state = new LabState();
+  readonly state: LabState;
   readonly camera = new PerspectiveCamera();
   readonly gpu: GPU;
   readonly name: string;
   private readonly scene = new Scene();
   private readonly waterScene = new Scene();
   private readonly parts: Part[];
-  private readonly swatch: Mesh;
+  private readonly joints: RevoluteJoint[];
+  private readonly swatch?: Mesh;
   private readonly lightCamera = new OrthographicCamera(-13, 13, 13, -13, 1, 58);
   private readonly shadowTarget;
   private readonly deferredTarget;
@@ -104,6 +106,7 @@ export class MillLab {
 
   constructor(canvas: HTMLCanvasElement, assets: SceneAssets, gpu: GPU) {
     this.name = assets.name;
+    this.state = new LabState(assets.waterline, assets.practice);
     this.gpu = gpu;
     this.audio = assets.audio.map(src => {
       const player = new Audio(src);
@@ -120,11 +123,16 @@ export class MillLab {
     this.waterTarget = gpu.target("Water geometry", { count: 3, depth: true });
     this.hitTarget = gpu.target("Refraction hit UV", { floating: true });
     this.compositeTarget = gpu.target("Water composite", { count: 4, floating: true });
+    const nightLights = assets.nightLights ?? ([[1.5, 7.9, -2.49], [3.5, 7.9, -2.49], [3.5, 4.5, -1.49]] as const)
+      .map(center => ({ center, falloff: 5.5, color: [3.5, 1.55, 0.43] as const }));
+    const anchors = [0, 1, 2].map(i => nightLights[i]);
     this.lightingUniforms = {
       inverseView: u(this.camera.matrixWorld), lightMatrix: u(this.lightMatrix),
       shadowMap: u(this.shadowTarget.depthTexture), lightDir: this.lightDir, daylight: this.daylight,
       shadows: u(false), lightingMode: u(2), shininess: u(35), roughness: u(0.34), metalness: u(0),
       useCel: u(false), useRim: u(false), nightLight: u(0),
+      nightAnchor: u(anchors.map(light => light ? new Vector4(...light.center, light.falloff) : new Vector4(0, 0, 0, 0))),
+      nightColor: u(anchors.map(light => light ? new Vector3(...light.color) : new Vector3())),
     };
     this.parts = assets.meshes.map(asset => {
       const maps = asset.maps;
@@ -132,11 +140,11 @@ export class MillLab {
       const shader = material(vertex, isWater ? water : opaque, {
         colorMap: u(maps.color), normalMap: u(maps.normal), specularMap: u(maps.specular),
         reflectionMap: u(maps.reflection), refractionMap: u(maps.refraction), cutout: u(asset.cutout),
-        ...this.lightingUniforms, ...this.surfaceControls, swatch: u(false),
+        ...this.lightingUniforms, ...this.surfaceControls, swatch: u(false), checkerScale: u(assets.practice ? 4 : 12),
         flowMap: u(assets.textures.flow), foamMap: u(assets.textures.foam), waterTime: this.waterTime,
       }, { side: isWater || asset.cutout ? DoubleSide : undefined });
       const mesh = new Mesh(asset.geometry, shader);
-      mesh.name = asset.role;
+      mesh.name = asset.part ?? asset.role;
       mesh.position.fromArray(asset.origin);
       if (Object.keys(asset.clips).length) {
         asset.attributes.setUsage(DynamicDrawUsage);
@@ -146,15 +154,19 @@ export class MillLab {
       const caster = material(vertex, shadow, { colorMap: u(maps.color), cutout: u(asset.cutout) }, { side: shader.side });
       return { asset, mesh, shader, shadow: caster, previousFrame: undefined };
     });
-    const base = this.parts.find(part => part.asset.role === "mill")!;
-    const swatch = base.shader.clone();
-    // Clone shader source but share the current frame uniforms.
-    swatch.uniforms = { ...base.shader.uniforms, swatch: u(true), cutout: u(false) };
-    this.swatch = new Mesh(new SphereGeometry(0.66, 48, 32), swatch);
-    this.swatch.name = "material swatch";
-    this.swatch.position.set(0.18, 5.9, -0.15);
-    this.swatch.visible = false;
-    this.scene.add(this.swatch);
+    this.joints = this.attachRigs(assets.rigs);
+    const swatchAnchor = assets.practice?.swatch;
+    const base = this.parts.find(part => part.asset.role === (swatchAnchor ? "opaque" : "mill"));
+    if (base) {
+      const swatch = base.shader.clone();
+      // Clone shader source but share the current frame uniforms.
+      swatch.uniforms = { ...base.shader.uniforms, swatch: u(true), cutout: u(false) };
+      this.swatch = new Mesh(new SphereGeometry(swatchAnchor?.radius ?? 0.66, 48, 32), swatch);
+      this.swatch.name = "material swatch";
+      this.swatch.position.fromArray(swatchAnchor?.center ?? [0.18, 5.9, -0.15]);
+      this.swatch.visible = false;
+      this.scene.add(this.swatch);
+    }
 
     const geometryInputs = {
       ...this.depthUniforms, depthTexture: u(this.opaqueTarget.depthTexture),
@@ -235,11 +247,48 @@ export class MillLab {
     }
   }
 
+  private attachRigs(rigs: SceneAssets["rigs"]): RevoluteJoint[] {
+    if (!rigs?.length) return [];
+    const meshes = new Map<string, Mesh[]>();
+    for (const { asset, mesh } of this.parts) {
+      if (asset.role !== "opaque" || !asset.part) continue;
+      const group = meshes.get(asset.part);
+      if (group) group.push(mesh);
+      else meshes.set(asset.part, [mesh]);
+    }
+    return rigs.flatMap(rig => {
+      const joints = new Map<string, { node: Group; pivot: Vector3 }>();
+      return rig.joints.map(({ id, parent, pivot, axis, amplitude, phase, speed, parts }) => {
+        const node = new Group();
+        node.name = id;
+        const worldPivot = new Vector3().fromArray(pivot);
+        const ancestor = parent === undefined ? undefined : joints.get(parent);
+        node.position.copy(worldPivot);
+        if (ancestor) {
+          node.position.sub(ancestor.pivot);
+          ancestor.node.add(node);
+        } else {
+          this.scene.add(node);
+        }
+        // Exported pivots and mesh origins are in rest-world space. Move only
+        // the local origin so the authored pose survives reparenting.
+        for (const part of parts) {
+          for (const mesh of meshes.get(part) ?? []) {
+            mesh.position.sub(worldPivot);
+            node.add(mesh);
+          }
+        }
+        joints.set(id, { node, pivot: worldPivot });
+        return { node, axis: new Vector3().fromArray(axis).normalize(), amplitude, phase, speed, rest: Math.sin(phase) };
+      });
+    });
+  }
+
   private updateParts() {
+    const time = this.state.propsTime;
     for (const part of this.parts) {
       const { mesh, asset } = part;
       if (asset.role === "wheel") mesh.rotation.x = -Math.PI / 2 * this.state.wheelTime;
-      const time = this.state.propsTime;
       const clip = asset.clips[asset.role === "shutters" ? "open-shutters" : asset.role === "vane" ? "weather-vane-shake" : "banner-swing"];
       if (!clip) continue;
       const last = clip.frames.length - 1;
@@ -254,6 +303,10 @@ export class MillLab {
       asset.geometry.boundingBox = null;
       part.previousFrame = frame;
     }
+    for (const [index, { node, axis, amplitude, phase, speed, rest }] of this.joints.entries()) {
+      const animated = (Math.sin((time - 1) * speed + phase) - rest) * amplitude;
+      node.quaternion.setFromAxisAngle(axis, animated + MathUtils.degToRad(this.state.jointOffset(index)));
+    }
   }
 
   render(width: number, height: number) {
@@ -261,7 +314,7 @@ export class MillLab {
     const fx = state.activeEffects();
     const size = Math.min(1, 1200 / width);
     gpu.resize(Math.max(2, Math.round(width * size)), Math.max(2, Math.round(height * size)));
-    const pose = bookmarks[state.bookmark];
+    const pose = state.pose();
     camera.fov = pose.fov;
     camera.near = pose.near;
     camera.far = pose.far;
@@ -304,19 +357,18 @@ export class MillLab {
     this.surfaceControls.textureMode.value = fx.texture;
     this.surfaceControls.normalMode.value = fx.normals;
     this.surfaceControls.ripples.value = !!fx.ripples;
-    this.swatch.visible = !!fx.swatch;
+    if (this.swatch) this.swatch.visible = !!fx.swatch;
     this.aoRadius.value = fx.aoRadius;
     this.waterTime.value = state.waterTime;
     this.updateParts();
 
     if (fx.shadows || this.buffer === "Shadow map") {
-      const swatchVisible = this.swatch.visible;
-      this.swatch.visible = false;
+      if (this.swatch) this.swatch.visible = false;
       for (const part of this.parts) part.mesh.material = part.shadow;
       gpu.renderer.setRenderTarget(this.shadowTarget);
       gpu.renderer.render(this.scene, this.lightCamera);
       for (const part of this.parts) part.mesh.material = part.shader;
-      this.swatch.visible = swatchVisible;
+      if (this.swatch) this.swatch.visible = !!fx.swatch;
     }
     gpu.renderer.setRenderTarget(this.opaqueTarget);
     gpu.renderer.render(this.scene, camera);
@@ -411,7 +463,7 @@ export class MillLab {
 
   pick(x: number, y: number) {
     this.raycaster.setFromCamera(new Vector2(x * 2 - 1, y * 2 - 1), this.camera);
-    const hit = this.raycaster.intersectObjects(this.scene.children)[0];
+    const hit = this.raycaster.intersectObject(this.scene, true).find(candidate => candidate.object.visible);
     if (!hit) return null;
     this.state.focus = [x, y];
     const local = hit.object.worldToLocal(hit.point.clone());

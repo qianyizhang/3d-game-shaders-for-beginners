@@ -19,6 +19,10 @@ Serve a cleared manifest at that path or point the lab at one with
 of substituting an illustration. Without a renderable float target, the HDR
 bloom option is disabled and the legacy exercise remains live.
 
+For authored kits, follow the [scene and part gallery setup](scene-gallery.md).
+Those kits work without converting the original mill. The original weather
+station prototype is a separate, local-only review; it opens Waterline only.
+
 The converter reads the four original BAMs using Panda3D 1.10.16. It preserves
 native units, converts Z-up to Y-up as `(x, z, -y)`, and preserves the wheel's
 local origin `(-0.51001, 2.01001, -3.5)` and rotation about X. It separates
@@ -44,6 +48,13 @@ after the npm dependencies and original asset conversion are in place. It
 checks rendered pixels, shader edit recovery, audio, GPU and asset failure
 paths, keyboard controls, and Chrome touch emulation at 360 CSS pixels.
 Screenshots stay in memory during routine runs.
+
+After [preparing the scene kits](scene-gallery.md#run-locally), run
+`python3.12 test/dcc_adapter.py` and `npm run build && node test/scene-lessons.mjs`
+from `mill-shader-lab/`. The adapter check exercises the pins and a missing joint.
+This checks all 20 shared lessons on each kit, including the GPU buffers,
+material and normal comparisons, and both frozen pose comparisons. Optional
+scene slugs narrow the run during art and camera refinement.
 
 To regenerate the browser side of the local comparison gallery:
 

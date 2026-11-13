@@ -6,7 +6,7 @@ type Range = { key: Effect; label: string; min: number; max: number; step: numbe
 type Choice = { key: Effect; label: string; choices: readonly string[] };
 type Toggle = { key: Effect; label: string };
 export type Control = Range | Choice | Toggle;
-type Action = "focus" | "sweep" | "edit" | "reflect";
+type Action = "focus" | "sweep" | "edit" | "reflect" | "pose";
 export interface Lesson {
   id: string;
   group: "Geometry and light" | "Water and depth" | "Image and color";
@@ -186,6 +186,40 @@ export const lessons: readonly Lesson[] = [
   },
 ];
 export const firstLesson = lessons.find(lesson => lesson.id === "refraction")!;
+export const waterlineLesson = (subject = "the striped gauge"): Lesson => ({
+  ...firstLesson,
+  task: `Find ${subject} where it enters the water. Lower the index to 0.935, then switch A/B. Watch the submerged marks and bed shift while the dry parts stay fixed. In Refraction hit UV, rust marks an undistorted sample.`,
+  initial: { ao: 1, shadows: 1, reflection: 1, fresnel: 1, foam: 1, foamDepth: 0.58 },
+});
+
+const posingLesson: Lesson = {
+  id: "pose", group: "Water and depth", title: "Pose joints: refraction and shadows", scene: "Waterline",
+  task: "Play or step to find a pose, then freeze the frame. Choose a tail joint and rotate it in B. Look for the new ray hits and the shadow it casts on the bed.",
+  comparison: "A starts with the frozen pose. Save B as A to set a new reference. Both views share the camera, clock, sun and refraction index.",
+  initial: { shadows: 1, rior: 0.935 }, reference: {}, action: "pose",
+  views: ["Final color", "Opaque color", "Refracted color", "Refraction hit UV", "Shadow visibility", "Shadow map"],
+};
+
+export function practiceLessons(subject: string | undefined, hasRigs: boolean): readonly Lesson[] {
+  const tasks: Record<string, string> = {
+    spaces: "Pick a point on a visible object. Trace its object, world, view and screen coordinates. Orbit and pick again, then inspect depth and the shader source.",
+    lighting: "Find a highlight on a metal or lacquered edge. Compare diffuse, Phong and Blinn–Phong, then change shininess and sun pitch. Inspect specular and shadow visibility separately.",
+    reflection: "Compare mirror and rippled normals. Orbit or aim down until the reflected object leaves the frame. Rust in Reflection hit UV marks a miss.",
+    foam: "Widen the contact band with Foam depth. Inspect Flow direction, then step a frame in Flow UV. Turn off Flow map and step again. The water mesh stays put.",
+    fog: "Find one foreground object and one farther surface. Compare the linear ramp with exponential fog, then vary density and inspect Fog amount.",
+    smoke: "Switch A/B with the clock paused. Orbit the smoke source and compare the plume outline. Open Smoke mask, then step a frame to move both plumes together.",
+    ssao: "Find a corner, seam or bevel. Compare raw and filtered occlusion, then increase radius or open Waterline to see the joints at the water’s edge. The sun stays fixed.",
+    focus: "Pick a near edge and then a farther object. Look at the focus mask, then compare ordinary blur with dilated blur at the foreground edge.",
+    filter: "Follow a sharp edge. Compare box blur, separable Gaussian and Kuwahara. Kuwahara picks a low-variance quadrant. The native tutorial documents median filtering separately.",
+    bloom: "Compare the scene’s bright lamp or window with a dark surface. Inspect extraction, the half-resolution blur, the combined image and the legacy filter.",
+    grain: "Freeze and step the grain. Then use picked-focus fringing and click a visible edge. Compare an edge near the marker with a distant edge.",
+  };
+  return [...lessons, ...(hasRigs ? [posingLesson] : [])].map(lesson => lesson.id === "refraction" ? waterlineLesson(subject) : {
+    ...lesson,
+    task: tasks[lesson.id] ?? lesson.task,
+    ...(lesson.id === "smoke" ? { title: "Smoke: sprites and volume" } : {}),
+  });
+}
 
 export const effectPanel = [
   choose("texture", "Surface color"), choose("normals", "Normal source"), choose("lighting", "Lighting model"),

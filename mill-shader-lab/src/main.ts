@@ -2,8 +2,8 @@ import { loadAssets } from "./assets";
 import { GPU } from "./gpu";
 import { MillLab, buffers, defaultEdit, type BufferName } from "./lab";
 import { defaults, type Effect } from "./effects";
-import { effectPanel, firstLesson, lessons, type Control, type Lesson } from "./lessons";
-import { bookmarks, type Bookmark } from "./state";
+import { effectPanel, firstLesson, lessons, practiceLessons, waterlineLesson, type Control, type Lesson } from "./lessons";
+import { bookmarks, type Bookmark, type CameraPose } from "./state";
 
 function byId<T extends HTMLElement = HTMLElement>(key: string): T {
   const value = document.getElementById(key);
@@ -28,9 +28,14 @@ async function start() {
   const assets = await loadAssets(params.get("scene") ?? undefined);
   const lab = new MillLab(canvas, assets, gpu);
   const { state } = lab;
+  const practice = assets.practice;
+  const waterlineOnly = !!assets.waterline && !practice;
+  const availableLessons = practice ? practiceLessons(assets.waterline?.subject, assets.rigs.length > 0) :
+    waterlineOnly ? [waterlineLesson(assets.waterline?.subject)] : lessons;
+  const sceneLesson = availableLessons.find(entry => entry.id === "refraction") ?? firstLesson;
   let dirty = true;
   let lost = false;
-  let lesson: Lesson = firstLesson;
+  let lesson: Lesson = sceneLesson;
   let sweeping = false;
   let sweepStart = 0;
   const paint = () => { dirty = true; };
@@ -56,7 +61,11 @@ async function start() {
     updateCode();
     paint();
   };
-  const play = () => { state.playing = !state.playing; labelPlayback(); };
+  const play = () => {
+    if (state.jointPose) return;
+    state.playing = !state.playing;
+    labelPlayback();
+  };
   const sun = byId<HTMLInputElement>("sun");
   const bend = byId<HTMLInputElement>("bend");
   const compile = byId("compile");
@@ -70,10 +79,10 @@ async function start() {
     byId("sun-value").textContent = `${value}°`;
     paint();
   };
-  const bookmark = select("bookmark", Object.keys(bookmarks) as Bookmark[], open);
-  function open(name: Bookmark) {
+  const bookmark = select("bookmark", waterlineOnly ? ["Waterline"] : Object.keys(bookmarks) as Bookmark[], open);
+  function open(name: Bookmark, entryPose?: CameraPose) {
     sweeping = false;
-    state.open(name);
+    state.open(name, entryPose);
     bookmark.value = name;
     byId("stage-title").textContent = name;
     marker.hidden = true;
@@ -101,7 +110,7 @@ async function start() {
     ["Focus and motion", name => /^(Focus|Blurred|Dilated|Depth of field|Motion)/.test(name)],
     ["Image effects", () => true],
   ];
-  const names = Object.keys(buffers) as BufferName[];
+  const names = waterlineOnly ? sceneLesson.views : Object.keys(buffers) as BufferName[];
   const assigned = new Set<BufferName>();
   for (const [title, contains] of groups) {
     const group = document.createElement("optgroup");
@@ -110,7 +119,7 @@ async function start() {
       assigned.add(name);
       group.append(new Option(name, name));
     }
-    buffer.add(group);
+    if (group.children.length) buffer.add(group);
   }
   buffer.onchange = () => { const name = names.find(value => value === buffer.value); if (name) inspect(name); };
   byId<HTMLDetailsElement>("shader-code").ontoggle = updateCode;
@@ -174,10 +183,12 @@ async function start() {
     refresh();
     return { label, detach: () => set.delete(refresh) };
   }
-  for (const def of effectPanel) byId("effect-list").append(controlRow(def, "fx-").label);
+  for (const def of effectPanel) if (!waterlineOnly || def.key === "refraction") {
+    byId("effect-list").append(controlRow(def, "fx-").label);
+  }
   const lessonSelect = byId<HTMLSelectElement>("lesson");
   const lessonGroups = new Map<string, HTMLOptGroupElement>();
-  for (const entry of lessons) {
+  for (const entry of availableLessons) {
     let group = lessonGroups.get(entry.group);
     if (!group) {
       group = document.createElement("optgroup"); group.label = entry.group; lessonSelect.add(group);
@@ -186,7 +197,7 @@ async function start() {
     group.append(new Option(entry.title, entry.id));
   }
   lessonSelect.onchange = () => {
-    const selected = lessons.find(entry => entry.id === lessonSelect.value);
+    const selected = availableLessons.find(entry => entry.id === lessonSelect.value);
     if (selected) openLesson(selected);
   };
   let detachControls: (() => void)[] = [];
@@ -200,8 +211,63 @@ async function start() {
     for (const key of toggles) byId<HTMLInputElement>(key).checked = state[key];
     legacyLink.checked = state.legacyLink;
   }
+
+  const jointSelect = byId<HTMLSelectElement>("pose-joint");
+  const poseAngle = byId<HTMLInputElement>("pose-angle");
+  const joints = assets.rigs.flatMap(rig => {
+    for (const joint of rig.joints) {
+      const title = joint.label ?? joint.id.replaceAll("-", " ");
+      jointSelect.add(new Option(assets.rigs.length > 1 ? `${rig.name} · ${title}` : title, joint.id));
+    }
+    return rig.joints;
+  });
+  // Index by option order, since each creature may reuse a local joint ID.
+  function updateJoint() {
+    const index = jointSelect.selectedIndex;
+    const joint = joints[index];
+    if (!joint) return;
+    poseAngle.min = String(-joint.poseLimit);
+    poseAngle.max = String(joint.poseLimit);
+    const angle = state.jointPose?.experiment[index] ?? 0;
+    poseAngle.value = String(angle);
+    poseAngle.setAttribute("aria-valuetext", `${angle} degrees`);
+    byId("pose-value").textContent = `${angle}°`;
+  }
+  function updatePoseControls(message?: string) {
+    const posing = lesson.action === "pose";
+    const frozen = !!state.jointPose;
+    byId("pose-controls").hidden = !posing;
+    byId("pose-edit").hidden = !frozen;
+    byId("freeze-pose").textContent = frozen ? "Unfreeze frame" : "Freeze frame";
+    byId("pose-status").textContent = message ?? (frozen ?
+      `Frame ${state.frame} frozen. Unfreezing clears the pose edits.` : "Freeze the frame to edit joints.");
+    for (const key of ["play", "step", "overview"]) byId<HTMLButtonElement>(key).disabled = frozen;
+    bookmark.disabled = frozen;
+    const pin = byId<HTMLButtonElement>("pin-a");
+    pin.disabled = posing ? !frozen : !lesson.controls?.length;
+    pin.textContent = posing ? "Save B as A" : "Pin controls as A";
+    updateJoint();
+    labelPlayback();
+  }
+  jointSelect.onchange = updateJoint;
+  poseAngle.oninput = () => {
+    const joint = jointSelect.selectedIndex;
+    if (!state.jointPose || !joints[joint]) return;
+    state.jointPose.experiment[joint] = poseAngle.valueAsNumber;
+    updateJoint();
+    updateSide("B");
+  };
+  button("freeze-pose", () => {
+    if (state.jointPose) state.jointPose = undefined;
+    else state.freezePose(joints.length);
+    updatePoseControls();
+    updateSide("B");
+  });
   function openLesson(next: Lesson) {
     lesson = next;
+    state.jointPose = undefined;
+    const widest = Math.max(...joints.map(joint => joint.poseLimit));
+    jointSelect.selectedIndex = joints.findIndex(joint => joint.poseLimit === widest);
     lessonSelect.value = next.id;
     byId("lesson-title").textContent = next.title;
     byId("lesson-task").textContent = next.task;
@@ -214,7 +280,6 @@ async function start() {
     bend.value = defaultEdit;
     compile.textContent = "";
     byId("editor").hidden = next.action !== "edit";
-    byId<HTMLButtonElement>("pin-a").disabled = !next.controls?.length;
     detachControls.forEach(detach => detach());
     const rows = (next.controls ?? []).map(def => controlRow(def, ""));
     detachControls = rows.map(row => row.detach);
@@ -222,11 +287,13 @@ async function start() {
     byId("lesson-views").replaceChildren(...next.views.map(view => action(view, () => inspect(view))));
     const actions = byId("lesson-actions");
     actions.replaceChildren();
-    if (next.action === "focus") actions.append(action("Focus dock", () => focusWorld([2.1, 2.3, -4.2])),
-      action("Focus mill", () => focusWorld([2.0, 6.1, -1.6])));
+    if (next.action === "focus" && (!practice || next.id === "focus")) {
+      actions.append(action(practice ? "Focus near" : "Focus dock", () => focusWorld(practice?.focus.near ?? [2.1, 2.3, -4.2])),
+        action(practice ? "Focus far" : "Focus mill", () => focusWorld(practice?.focus.far ?? [2.0, 6.1, -1.6])));
+    }
     if (next.action === "reflect") actions.append(action("Aim down at water", () => {
       const eye = lab.camera.position.clone();
-      state.target.set(1.1, 0.65, 6.0);
+      state.target.fromArray(practice?.reflectionAim ?? [1.1, 0.65, 6.0]);
       state.orbit.setFromVector3(eye.sub(state.target));
       paint();
     }), action("Restore pond view", () => open("Across the pond")));
@@ -240,10 +307,17 @@ async function start() {
     }
     syncEffects();
     open(next.scene);
+    updatePoseControls();
     inspect("Final color");
     updateSide("B");
   }
   button("pin-a", () => {
+    if (lesson.action === "pose" && state.jointPose) {
+      state.pinPose();
+      updatePoseControls(`B saved as A at frame ${state.frame}. Change a joint in B to compare.`);
+      updateSide("B");
+      return;
+    }
     const keys = new Set<Effect>([...Object.keys(lesson.reference) as Effect[], ...(lesson.controls ?? []).map(def => def.key)]);
     state.baseline = Object.fromEntries([...keys].map(key => [key, state.effects[key]]));
     byId("compare-caption").textContent = "A holds these lesson controls at the pinned values. Both sides share the camera, clock and other effects.";
@@ -268,7 +342,21 @@ async function start() {
   button("step", () => {
     state.playing = false; labelPlayback(); state.step(1 / 60); labelClock(); paint();
   });
-  button("overview", () => open("Overview"));
+  button("overview", () => open(waterlineOnly ? "Waterline" : "Overview"));
+  canvas.setAttribute("aria-label", `${assets.name} scene`);
+  if (assets.waterline) {
+    for (const key of ["wheel", "legacy-link", "sound"]) byId(key).closest("label")!.hidden = true;
+    const props = byId("props");
+    const label = props.closest("label")!;
+    label.hidden = assets.rigs.length === 0;
+    if (assets.rigs.length) label.replaceChildren(props, " Animate creatures");
+    byId("legacy").hidden = true;
+  }
+  if (waterlineOnly) {
+    bookmark.closest("label")!.hidden = true;
+    lessonSelect.closest("label")!.hidden = true;
+    byId("overview").textContent = "Restore Waterline";
+  }
   button("side-a", () => { state.playing = false; sweeping = false; labelPlayback(); updateSide("A"); });
   button("side-b", () => { state.playing = false; sweeping = false; labelPlayback(); updateSide("B"); });
   button("apply", () => {
@@ -285,7 +373,8 @@ async function start() {
   button("reset", () => openLesson(lesson));
 
   const zoom = (factor: number) => {
-    const limits = state.bookmark === "Overview" || state.bookmark === "Camera sweep" ? [190, 1940] : [2, 45];
+    const legacyWide = !practice && (state.bookmark === "Overview" || state.bookmark === "Camera sweep");
+    const limits = legacyWide ? [190, 1940] : [2, 45];
     state.orbit.radius = Math.max(limits[0]!, Math.min(limits[1]!, state.orbit.radius * factor));
     paint();
   };
@@ -374,7 +463,9 @@ async function start() {
   };
 
   status.textContent = `${lab.name} · WebGL 2 · ${gpu.hdr ? "Float targets available" : "SDR targets"}`;
-  openLesson(lesson);
+  const requested = availableLessons.find(entry => entry.id === params.get("lesson"));
+  openLesson(requested ?? lesson);
+  if (!requested && practice) open(practice.start, assets.waterline);
   workbench.hidden = false;
   new ResizeObserver(paint).observe(canvas);
   canvas.addEventListener("webglcontextlost", () => {

@@ -1,4 +1,4 @@
-import { Vector2, type Matrix4, type PerspectiveCamera, type Texture, type WebGLRenderTarget } from "three";
+import { Vector2, Vector3, type Matrix4, type PerspectiveCamera, type Texture, type WebGLRenderTarget } from "three";
 import type { SceneAssets } from "./assets";
 import type { Effects } from "./effects";
 import { GPU, u } from "./gpu";
@@ -89,10 +89,14 @@ export class Post {
       opaqueDepth: u(opaqueDepth), waterDepth: u(waterDepth),
       projection: u(camera.projectionMatrix), inverseProjection: u(camera.projectionMatrixInverse),
     };
+    const practice = assets.practice;
     this.atmosphere = gpu.pass(atmosphere, {
       ...depth, inputColor: u(null), smokeMap: u(assets.textures.smoke),
       viewMatrix: u(camera.matrixWorldInverse), inverseView: u(camera.matrixWorld),
       daylight: u(1), fogMode: u(0), fogNear: u(2), fogFar: u(9), fogDensity: u(0.18), smokeMode: u(0), time: u(0),
+      fogOrigin: u(new Vector3().fromArray(practice?.bookmarks["Near to far"].target ?? [0, 0, 0])),
+      smokeOrigin: u(new Vector3().fromArray(practice?.smoke.origin ?? [0.47, 8.9, -4.5])),
+      smokeScale: u(practice?.smoke.scale ?? 1),
     });
     this.edge = gpu.pass(edges, {
       ...depth, inputColor: u(null), opaqueNormal: u(opaqueNormal), waterNormal: u(waterNormal), mode: u(0), threshold: u(0.22),

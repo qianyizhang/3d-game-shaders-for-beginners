@@ -14,12 +14,14 @@ uniform int fogMode;
 uniform float fogNear;
 uniform float fogFar;
 uniform float fogDensity;
+uniform vec3 fogOrigin;
 uniform int smokeMode;
+uniform vec3 smokeOrigin;
+uniform float smokeScale;
 uniform float time;
 #include <lab_depth>
 
 const int puffCount = 8;
-const vec3 chimney = vec3(0.47, 8.9, -4.5);
 const vec3 plumeDrift = vec3(0.84, 3.6, -0.48);
 const float wobble = 0.22;
 const float baseWidth = 0.27;
@@ -35,8 +37,8 @@ struct Puff {
 Puff smokePuff(int i) {
   float seed = float(i) * 1.618;
   float age = fract(time * 0.37 + float(i) / float(puffCount));
-  vec3 center = chimney + age * plumeDrift + vec3(sin(seed + age) * wobble, 0.0, 0.0);
-  return Puff(center, baseWidth + age * widthGrowth, sin(age * 3.14159));
+  vec3 center = smokeOrigin + age * plumeDrift * smokeScale + vec3(sin(seed + age) * wobble * smokeScale, 0.0, 0.0);
+  return Puff(center, (baseWidth + age * widthGrowth) * smokeScale, sin(age * 3.14159));
 }
 
 float drawSprites(inout vec3 c, vec3 p, vec3 tint) {
@@ -87,9 +89,10 @@ float marchSmoke(vec3 p) {
   vec3 rayDir = mat3(inverseView) * normalize(p);
   vec3 invDir = mix(vec3(-1.0), vec3(1.0), greaterThanEqual(rayDir, vec3(0.0)))
               / max(abs(rayDir), vec3(0.000001));
-  vec3 pad = vec3((baseWidth + widthGrowth) * 0.5) + vec3(wobble, 0.0, 0.0);
-  vec3 lo = (chimney + min(plumeDrift, vec3(0.0)) - pad - rayOrigin) * invDir;
-  vec3 hi = (chimney + max(plumeDrift, vec3(0.0)) + pad - rayOrigin) * invDir;
+  vec3 drift = plumeDrift * smokeScale;
+  vec3 pad = (vec3((baseWidth + widthGrowth) * 0.5) + vec3(wobble, 0.0, 0.0)) * smokeScale;
+  vec3 lo = (smokeOrigin + min(drift, vec3(0.0)) - pad - rayOrigin) * invDir;
+  vec3 hi = (smokeOrigin + max(drift, vec3(0.0)) + pad - rayOrigin) * invDir;
   vec3 entry = min(lo, hi);
   vec3 exit = max(lo, hi);
   float start = max(max(entry.x, max(entry.y, entry.z)), length(viewPosition(screenUV, 0.0)));
@@ -100,6 +103,8 @@ float marchSmoke(vec3 p) {
   for (int i = 0; i < puffCount; ++i) puffs[i] = smokePuff(i);
   const int steps = 36;
   float stepLength = (end - start) / float(steps);
+  // Integrate in emitter units so a small vent and a large chimney retain the same puff opacity.
+  float localStepLength = stepLength / smokeScale;
   float opticalDepth = 0.0;
   for (int stepIndex = 0; stepIndex < steps; ++stepIndex) {
     vec3 samplePos = rayOrigin + rayDir * (start + (float(stepIndex) + 0.5) * stepLength);
@@ -111,10 +116,10 @@ float marchSmoke(vec3 p) {
     }
     if (density > 0.0) {
       // Break up the puffs with a 3D pattern that drifts along with the plume.
-      vec3 q = (samplePos - chimney - plumeDrift * (time * 0.37)) * 7.0;
+      vec3 q = ((samplePos - smokeOrigin) / smokeScale - plumeDrift * (time * 0.37)) * 7.0;
       float billows = noise3D(q);
       density = max(0.0, density - 0.18 * (1.0 - billows)) * mix(0.65, 2.55, billows);
-      opticalDepth += density * stepLength;
+      opticalDepth += density * localStepLength;
     }
   }
   // Constant smoke tint: combine attenuation over the ray before compositing.
@@ -133,7 +138,7 @@ void main() {
     covered = marchSmoke(p);
     c = mix(c, smokeTint, covered);
   }
-  float originZ = (viewMatrix * vec4(0.0, 0.0, 0.0, 1.0)).z;
+  float originZ = (viewMatrix * vec4(fogOrigin, 1.0)).z;
   float relativeZ = originZ - p.z;
   float f = 0.0;
   if (d < 1.0 && fogMode == 1) f = clamp((relativeZ - fogNear) / max(fogFar - fogNear, 0.1), 0.0, 0.97);

@@ -59,6 +59,13 @@ shading techniques with Panda3D and OpenGL specifically.
 - [Lookup Table (LUT)](sections/lookup-table.md)
 - [Gamma Correction](sections/gamma-correction.md)
 
+## Browser Lab and authored scenes
+
+Use the [Mill Shader Lab](project-docs/mill-shader-lab-verification.md) to run
+the original mill locally. The [scene and part gallery](project-docs/scene-gallery.md)
+shows five authored kits you can restore and explore without converting the
+original mill. The [DCC library](dcc/README.md) owns the art and recovery setup.
+
 ## License
 
 The included license applies only to the software portion of 3D Game Shaders For Beginners—

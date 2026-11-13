@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "scenes": {
+    "ferry-landing": {
+      "id": "ferry-landing-019be318dee932f6",
+      "manifestSha256": "4746154b6a04c759c07b347705ed94d32c7c28a794762ac4c0cd5d0c5a85113a",
+      "requiredParts": [
+        "bamboo-pole",
+        "submerged-paving",
+        "ferry-water"
+      ],
+      "requiredJoints": []
+    },
+    "glasshouse": {
+      "id": "glasshouse-6fe1d62e8dd2d304",
+      "manifestSha256": "69f911753423dc17f92ad2725d55f9a84152ce79d09f23aa80fbf5d4b859d2aa",
+      "requiredParts": [
+        "waterline-leaf",
+        "checker-tiles",
+        "pond-water",
+        "amber-koi-tail",
+        "vermilion-koi-tail"
+      ],
+      "requiredJoints": [
+        "amber-koi-tail",
+        "vermilion-koi-tail",
+        "vermilion-koi-fork"
+      ]
+    },
+    "night-market": {
+      "id": "night-market-44bdf956b3b29a62",
+      "manifestSha256": "675bdf82c2c6e110092e16ee86c48e3f17a577f831345bbd75649f4069884876",
+      "requiredParts": [
+        "drain-grate",
+        "tiled-drain-bed",
+        "drain-water"
+      ],
+      "requiredJoints": []
+    },
+    "puppet-yard": {
+      "id": "puppet-yard-d863e0580120bb73",
+      "manifestSha256": "039bab4710852ac56b94d8fd01ad907a52b69b3bd2884669b8ce1e2c70f0060f",
+      "requiredParts": [
+        "dragon-tail-3",
+        "pool-tiles",
+        "pool-water"
+      ],
+      "requiredJoints": [
+        "dragon-tail-3",
+        "dragon-tail-4"
+      ]
+    },
+    "weather-station": {
+      "id": "weather-station-eeaac23c79bd6d6c",
+      "manifestSha256": "56ee1ea73a5912ee08e9bf4b41175c43244d6876ab51aac6da2013f2a4c79398",
+      "requiredParts": [
+        "striped-gauge",
+        "canal-bed",
+        "canal-water"
+      ],
+      "requiredJoints": []
+    }
+  }
+}

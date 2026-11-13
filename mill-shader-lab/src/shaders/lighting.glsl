@@ -11,6 +11,8 @@ uniform float metalness;
 uniform bool useCel;
 uniform bool useRim;
 uniform float nightLight;
+uniform vec4 nightAnchor[3];
+uniform vec3 nightColor[3];
 
 const float PI = 3.14159265;
 
@@ -58,12 +60,16 @@ vec3 shade(vec3 base, vec3 n, vec3 p, float mask, out vec3 highlight, out float 
     base *= (1.0 - (f0 + (1.0 - f0) * pow(1.0 - hv, 5.0))) * (1.0 - metalness);
   }
   highlight *= visibility * step(0.0001, nl);
-  vec3 world = (inverseView * vec4(p, 1.0)).xyz;
-  vec3 a = world - vec3(1.5, 7.9, -2.49);
-  vec3 b = world - vec3(3.5, 7.9, -2.49);
-  vec3 c = world - vec3(3.5, 4.5, -1.49);
-  float glow = exp(-dot(a, a) * 5.5) + exp(-dot(b, b) * 5.5) + exp(-dot(c, c) * 5.5);
-  vec3 window = vec3(3.5, 1.55, 0.43) * glow * nightLight;
+  vec3 window = vec3(0.0);
+  if (nightLight > 0.0) {
+    vec3 world = (inverseView * vec4(p, 1.0)).xyz;
+    for (int i = 0; i < 3; ++i) {
+      if (nightAnchor[i].w <= 0.0) continue;
+      vec3 delta = world - nightAnchor[i].xyz;
+      window += nightColor[i] * exp(-dot(delta, delta) * nightAnchor[i].w);
+    }
+    window *= nightLight;
+  }
   vec3 light = mix(vec3(0.16, 0.23, 0.39), vec3(1.0, 0.91, 0.77), daylight);
   vec3 ambient = base * mix(vec3(0.16, 0.21, 0.32), vec3(0.46, 0.48, 0.58), daylight);
   vec3 rim = useRim ? pow(1.0 - nv, 3.0) * vec3(0.12, 0.27, 0.4) : vec3(0.0);

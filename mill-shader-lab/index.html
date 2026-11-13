@@ -14,7 +14,7 @@
     <a href="https://lettier.github.io/3d-game-shaders-for-beginners/index.html">Original tutorial ↗</a>
   </header>
   <main>
-    <p class="status" id="status" role="status">Loading the local mill…</p>
+    <p class="status" id="status" role="status">Loading the local scene…</p>
     <section id="fallback" hidden>
       <h2>The live lab is unavailable</h2>
       <p id="failure"></p>
@@ -60,6 +60,16 @@
           </div>
           <p class="help" id="compare-caption"></p>
           <div id="lesson-controls"></div>
+          <div id="pose-controls" hidden>
+            <div class="toolbar"><button type="button" id="freeze-pose">Freeze frame</button></div>
+            <p class="help" id="pose-status" role="status">Freeze the frame to edit joints.</p>
+            <div id="pose-edit" hidden>
+              <label class="stack" for="pose-joint">Joint</label>
+              <select id="pose-joint"></select>
+              <div class="slider"><label for="pose-angle">B rotation from frozen pose</label><output id="pose-value" for="pose-angle">0°</output>
+              <input id="pose-angle" type="range" min="-20" max="20" value="0" step="1"></div>
+            </div>
+          </div>
           <div class="toolbar" id="lesson-views" aria-label="Lesson buffers"></div>
           <div class="toolbar" id="lesson-actions" aria-label="Lesson actions"></div>
           <details id="editor">
