@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DCC · Asset Library</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+<script src="catalog.js" defer></script>
+<script src="viewer.js" defer></script>
+<script src="gallery.js" defer></script>
+</head>
+<body>
+<header><p class="eyebrow">ART SOURCE / DELIVERY CATALOG</p><h1>DCC Asset Library</h1><p>Find a scene, a part, or the map that gives it its surface.</p></header>
+<main>
+  <section class="browse" aria-labelledby="browse-title">
+    <h2 id="browse-title">Browse</h2>
+    <div class="filters">
+      <div><label for="query">Search</label><input type="search" id="query" placeholder="Try koi, lacquer, or tail"></div>
+      <div><label for="kind">Kind</label><select id="kind"><option value="">All kinds</option></select></div>
+      <div><label for="tag">Tag</label><select id="tag"><option value="">All tags</option></select></div>
+    </div>
+    <p id="count" role="status"></p>
+    <ul id="results"></ul>
+  </section>
+  <section id="detail" aria-labelledby="asset-title">
+    <p class="eyebrow" id="asset-kind"></p>
+    <h2 id="asset-title" tabindex="-1"></h2>
+    <p id="asset-summary"></p>
+    <div id="preview" hidden>
+      <canvas id="model" width="820" height="520" role="img" aria-label="Isolated mesh preview"></canvas>
+      <p id="viewer-status" role="status"></p>
+      <div class="toolbar">
+        <button id="turn-left" type="button">Rotate left</button><button id="turn-right" type="button">Rotate right</button>
+        <label><input id="uv" type="checkbox"> UV checker</label>
+      </div>
+    </div>
+    <figure id="texture" hidden><img alt=""><figcaption></figcaption></figure>
+    <div id="facts"></div>
+    <div id="connections"></div>
+  </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,52 @@
+{
+  "provenance": {
+    "creator": "Project contributors",
+    "origin": "Authored procedural art for this project; no third-party model or texture bytes",
+    "rights": "Project-authored; no separate public asset license declared",
+    "status": "local-use"
+  },
+  "scenes": {
+    "glasshouse": {
+      "tags": ["storybook", "pond", "waterline", "rigged"],
+      "objects": {
+        "conservatory": {"title": "Conservatory", "parts": ["iron-bays", "roof-side", "arched-door", "lamp-and-vent"], "tags": ["architecture", "painted-metal"]},
+        "koi-pond": {"title": "Koi pond", "parts": ["pond-coping", "checker-tiles", "pond-water"], "tags": ["waterline", "ceramic"]},
+        "pond-planting": {"title": "Pond planting", "parts": ["waterline-leaf", "pots-and-planting"], "tags": ["plant", "waterline"]}
+      }
+    },
+    "weather-station": {
+      "tags": ["storybook", "canal", "waterline"],
+      "objects": {
+        "station": {"title": "Weather station", "parts": ["station-shell", "window-and-door", "roof-and-flue", "weather-instruments", "station-beacon"], "tags": ["architecture", "copper"]},
+        "station-waterfront": {"title": "Station waterfront", "parts": ["station-quay", "station-dock", "striped-gauge", "canal-bed", "canal-water"], "tags": ["waterline", "timber"]},
+        "station-yard-kit": {"title": "Station yard kit", "parts": ["station-yard", "station-bank"], "tags": ["prop", "plant"]}
+      }
+    },
+    "ferry-landing": {
+      "tags": ["storybook", "river", "waterline"],
+      "objects": {
+        "pavilion": {"title": "River pavilion", "parts": ["river-pavilion", "curved-eaves", "ferry-lantern", "quay-brazier"], "tags": ["architecture", "lantern"]},
+        "covered-ferry": {"title": "Covered ferry", "parts": ["ferry-hull", "ferry-canopy", "bamboo-pole"], "tags": ["vehicle", "timber"]},
+        "ferry-waterfront": {"title": "Ferry waterfront", "parts": ["ferry-quay", "submerged-paving", "ferry-water"], "tags": ["waterline", "stone"]},
+        "ferry-landscape": {"title": "River landscape", "parts": ["river-ridges", "autumn-maple"], "tags": ["plant", "terrain"]}
+      }
+    },
+    "night-market": {
+      "tags": ["storybook", "night", "waterline"],
+      "objects": {
+        "repair-stall": {"title": "Repair stall", "parts": ["corner-facade", "ribbed-shutter", "striped-awning", "repair-counter", "bench-tools", "shop-lights"], "tags": ["architecture", "metal", "neon"]},
+        "storm-drain": {"title": "Storm drain", "parts": ["sidewalk-and-drain", "tiled-drain-bed", "drain-grate", "drain-water"], "tags": ["waterline", "stone"]},
+        "alley-kit": {"title": "Alley utilities", "parts": ["alley-utilities"], "tags": ["prop"]}
+      }
+    },
+    "puppet-yard": {
+      "tags": ["storybook", "pond", "rigged", "waterline"],
+      "objects": {
+        "workshop": {"title": "Puppet workshop", "parts": ["shelter", "curtain", "bench", "craft-props", "lamp-vessel", "courtyard", "potted-plants"], "tags": ["architecture", "timber"]},
+        "puppet-pool": {"title": "Puppet pool", "parts": ["pool-rim", "pool-tiles", "pool-water"], "tags": ["waterline", "ceramic"]},
+        "water-dragon": {"title": "Water dragon", "parts": ["dragon-head", "dragon-chest", "dragon-body", "dragon-tail-1", "dragon-tail-2", "dragon-tail-3", "dragon-tail-4"], "rig": "Water dragon", "tags": ["creature", "lacquer", "waterline"]},
+        "raised-dragon": {"title": "Raised dragon pose", "parts": ["dragon-raised"], "variantOf": "water-dragon", "tags": ["creature", "lacquer", "pose"]}
+      }
+    }
+  }
+}

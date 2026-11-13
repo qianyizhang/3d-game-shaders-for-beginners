@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "scenes": {
+    "puppet-yard": "puppet-yard-d863e0580120bb73",
+    "ferry-landing": "ferry-landing-019be318dee932f6",
+    "night-market": "night-market-44bdf956b3b29a62",
+    "glasshouse": "glasshouse-6fe1d62e8dd2d304",
+    "weather-station": "weather-station-eeaac23c79bd6d6c"
+  }
+}

@@ -1,0 +1,5 @@
+[
+  {"id": "amber-koi", "asset": "amber-koi", "position": [-1.42, -0.36, 1.07], "scale": 0.88, "yaw": 0.35},
+  {"id": "vermilion-koi", "asset": "vermilion-koi", "position": [0.54, -0.43, 2.58], "scale": 0.96, "yaw": -0.71},
+  {"id": "terracotta-planter", "asset": "terracotta-planter", "position": [-2.82, 0.35, -1.61]}
+]

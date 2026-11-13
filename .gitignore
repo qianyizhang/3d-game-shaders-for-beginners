@@ -9,4 +9,5 @@ blends/**
 !blends/mill-scene/mill-scene-low-poly-backup.blend
 
 /.local/
+/.env.local
 .DS_Store
