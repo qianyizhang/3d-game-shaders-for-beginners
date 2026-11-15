@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { labPage, watchErrors, withLab } from "./browser.mjs";
 import { pixelStats, samePixels } from "./pixels.mjs";
 import { waterline } from "./waterline.mjs";
+import { inspectionChecks, bloomInspectionChecks } from "./inspection-ui.mjs";
 
 await withLab(async ({ base, context }) => {
   const desktop = await context();
@@ -20,6 +21,7 @@ await withLab(async ({ base, context }) => {
   const { $, choose, check, click, control: set, open, ready, reveal, side, shot, view } = ui;
   await ready();
   assert.match(await $("status").textContent(), /Original mill · WebGL 2 · Float targets available/);
+  await inspectionChecks(ui);
   await waterline(ui);
   const pixels = (a, b) => pixelStats(page, a, b);
   const compare = async (a, b, label, minimum = 120) => {
@@ -56,7 +58,7 @@ await withLab(async ({ base, context }) => {
   await compare(raw, linear, "raw / linear depth");
   await compare(linear, position, "linear depth / view position");
   await page.locator("#shader-code summary").click();
-  await page.waitForFunction(() => document.querySelector("#code").textContent.length > 0);
+  await ui.stable(); // The details toggle refreshes code in a queued browser task.
   assert.match(await $("code").textContent(), /layout\(location = 0\)/);
   await choose("shader-stage", "vertex");
   assert.match(await $("code").textContent(), /modelViewMatrix/);
@@ -286,6 +288,7 @@ async function fallbacks(context, base) {
   const legacy = await ui.shot();
   await ui.choose("bloom", "0");
   assert.ok((await pixelStats(sdr, legacy, await ui.shot())).count > 120, "SDR legacy bloom must render");
+  await bloomInspectionChecks(ui, false);
   await ui.open("smoke");
   assert.ok((await pixelStats(sdr, await ui.view("Smoke mask"))).max > 60, "SDR smoke volume must render");
   assertClean();

@@ -7,8 +7,9 @@
     "check": "tsc --noEmit",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
+    "test:inspection": "node --test test/inspection.mjs",
     "test:state": "node --test test/state.mjs",
-    "test": "npm run test:state && npm run build && node test/full.mjs",
+    "test": "npm run test:inspection && npm run test:state && npm run build && node test/full.mjs",
     "capture:parity": "npm run build && node test/parity.mjs"
   },
   "dependencies": {

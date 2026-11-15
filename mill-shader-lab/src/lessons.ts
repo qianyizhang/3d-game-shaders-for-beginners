@@ -1,5 +1,5 @@
 import { modes, type Effect, type Effects } from "./effects";
-import type { BufferName } from "./lab";
+import type { BufferName } from "./inspection";
 import type { Bookmark } from "./state";
 
 type Range = { key: Effect; label: string; min: number; max: number; step: number; digits?: number };

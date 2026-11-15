@@ -2,9 +2,10 @@ import {
   DoubleSide, DynamicDrawUsage, Group, MathUtils, Matrix4, Mesh, OrthographicCamera, PerspectiveCamera, SphereGeometry, Raycaster, Scene,
   Vector2, Vector3, Vector4, type Texture, type RawShaderMaterial,
 } from "three";
-import { Post, isPostBuffer, postBuffers } from "./post";
+import { Post } from "./post";
+import { BufferInspection, type BufferName, type ResolvedView } from "./inspection";
 import type { MeshAsset, SceneAssets } from "./assets";
-import { GPU, material, source, u, type Uniforms } from "./gpu";
+import { GPU, material, u, type Uniforms } from "./gpu";
 import { LabState, legacy } from "./state";
 import vertex from "./shaders/geometry.vert?raw";
 import opaque from "./shaders/opaque.frag?raw";
@@ -17,39 +18,8 @@ import deferred from "./shaders/deferred.frag?raw";
 import reflection from "./shaders/reflection.frag?raw";
 import ssao from "./shaders/ssao.frag?raw";
 import aoFilter from "./shaders/ao-filter.frag?raw";
-import screen from "./shaders/screen.vert?raw";
 
 export const defaultEdit = "1.0";
-export const buffers = {
-  ...postBuffers,
-  "Final color": ["Display output", "Screen", "The final image, with the selected display curve applied once."],
-  "Opaque color": ["Forward or deferred opaque lighting", "Water composite", "Lit opaque scene, with no water drawn into it."],
-  "Albedo": ["Opaque geometry", "Material inspection", "Sampled color map before lighting."],
-  "Encoded normals": ["Opaque geometry", "Geometry inspection", "View-space direction packed from −1…1 into RGB."],
-  "Raw depth": ["Opaque depth attachment", "Water ray search", "Hardware depth concentrates precision near the camera."],
-  "Linear depth": ["Opaque depth attachment", "View-space reconstruction", "A linear remap of reconstructed camera distance."],
-  "View position": ["Opaque depth attachment", "Water ray search", "View-space XYZ reconstructed from depth; displayed relative to the target plane."],
-  "Water mask": ["Water geometry + depth test", "Water composite", "Only water in front of opaque geometry is eligible."],
-  "Refraction hit UV": ["Refraction ray search", "Water composite", "Red and green encode hit U and V. Rust marks a miss; the composite uses the original UV."],
-  "Refracted color": ["Water composite", "Display output", "The sampled opaque image with water tint. Misses keep the undistorted sample."],
-  "Shadow map": ["Light-space geometry", "Opaque lighting", "Depth seen by the sun or moon. The light cannot reach a fragment behind this stored depth."],
-  "Shadow visibility": ["Opaque lighting", "Opaque color", "White receives direct light; dark areas are blocked in the light's view."],
-  "Specular": ["Opaque lighting", "Opaque color", "Only the direct highlight contribution."],
-  "Forward color": ["Opaque geometry lighting", "Water composite", "Lighting evaluated on visible mesh fragments in the geometry pass."],
-  "Deferred color": ["Fullscreen lighting", "Water composite", "Lighting evaluated from G-buffer color, normals, specular mask and reconstructed view position."],
-  "SSAO raw": ["SSAO hemisphere samples", "Bilateral AO filter", "Lower visibility marks nearby depth blockers in the hemisphere around the normal."],
-  "SSAO filtered": ["Bilateral AO filter", "Water composite", "Smoothed occlusion that avoids mixing distant surfaces across a depth edge."],
-  "Reflection mask": ["Water geometry + depth test", "Water composite", "Visible reflection coverage from the authored material mask."],
-  "Reflection hit UV": ["Reflection ray search", "Water composite", "Hit UV in red/green; blue tracks visibility near the frame edge; rust marks a miss."],
-  "Fresnel weight": ["Water composite", "Scene color", "The blend weight for reflected light. With Fresnel on, grazing views are brighter."],
-  "Reflection color": ["Water composite", "Scene color", "Visible reflected opaque color. Missing rays fall back to sky in the composite."],
-  "Foam": ["Water composite", "Scene color", "Pattern weighted by the depth gap between water and geometry."],
-  "Flow direction": ["Water geometry", "Water normals", "Red and green encode the signed texture-space flow vector."],
-  "Flow UV": ["Water geometry", "Water normals", "Red and green display the moving fractional UV, as used to sample the normal texture."],
-  "Water depth": ["Water depth attachment", "Water ray search", "Depth of the closest water surface before testing opaque visibility."],
-  "Water normals": ["Water geometry", "Refraction ray search", "Tangent-space ripples transformed into view space."],
-} as const;
-export type BufferName = keyof typeof buffers;
 
 type Part = { asset: MeshAsset; mesh: Mesh; shader: RawShaderMaterial; shadow: RawShaderMaterial; previousFrame: Float32Array | undefined };
 type RevoluteJoint = { node: Group; axis: Vector3; amplitude: number; phase: number; speed: number; rest: number };
@@ -101,7 +71,7 @@ export class MillLab {
   private readonly focusUV = new Vector2();
   private readonly audio: HTMLAudioElement[];
   private buffer: BufferName = "Final color";
-  private expression = defaultEdit;
+  private readonly inspection: BufferInspection;
   private audioRequest = 0;
 
   constructor(canvas: HTMLCanvasElement, assets: SceneAssets, gpu: GPU) {
@@ -197,6 +167,12 @@ export class MillLab {
     });
     this.post = new Post(gpu, this.camera, assets, this.opaqueTarget.depthTexture!,
       this.waterTarget.depthTexture!, this.opaqueTarget.textures[1]!, this.waterTarget.textures[0]!, this.previousViewProjection);
+    this.inspection = new BufferInspection({
+      scene: { opaque: this.opaqueTarget, water: this.waterTarget, hit: this.hitTarget,
+        composite: this.compositeTarget, shadow: this.shadowTarget, deferred: this.deferredTarget,
+        reflection: this.reflectionTarget, aoRaw: this.aoRaw, aoSmooth: this.aoSmooth },
+      post: this.post.inspectionResources, hdr: gpu.hdr,
+    });
     canvas.addEventListener("webglcontextlost", event => event.preventDefault());
   }
 
@@ -213,40 +189,26 @@ export class MillLab {
     this.gpu.validate(fragment);
     const prior = this.refractionB;
     this.refractionB = this.gpu.pass(fragment, this.refractionUniforms);
-    this.expression = expression;
     if (prior !== this.refractionA) prior.dispose();
   }
 
   resetEdit() {
     if (this.refractionB !== this.refractionA) this.refractionB.dispose();
     this.refractionB = this.refractionA;
-    this.expression = defaultEdit;
   }
 
   selectBuffer(value: BufferName) { this.buffer = value; }
 
-  code(): { vertex: string; fragment: string } {
-    if (isPostBuffer(this.buffer)) {
-      return { vertex: screen, fragment: source(this.post.view(this.buffer, this.state.activeEffects()).fragment) };
-    }
-    switch (this.buffer) {
-      case "Refraction hit UV": case "Water mask":
-        return { vertex: screen, fragment: source(this.refractionSource(this.state.side === "A" ? defaultEdit : this.expression)) };
-      case "Deferred color": return { vertex: screen, fragment: source(deferred) };
-      case "Opaque color": case "Specular": case "Shadow visibility":
-        return this.state.activeEffects().deferred
-          ? { vertex: screen, fragment: source(deferred) } : { vertex, fragment: source(opaque) };
-      case "Shadow map": return { vertex, fragment: shadow };
-      case "SSAO raw": return { vertex: screen, fragment: source(ssao) };
-      case "SSAO filtered": return { vertex: screen, fragment: source(aoFilter) };
-      case "Reflection mask": case "Reflection hit UV": return { vertex: screen, fragment: source(reflection) };
-      case "Fresnel weight": case "Reflection color": case "Foam": return { vertex: screen, fragment: source(composite) };
-      case "Flow direction": case "Flow UV": case "Water depth":
-      case "Water normals": return { vertex, fragment: source(water) };
-      case "Refracted color": return { vertex: screen, fragment: source(composite) };
-      case "Final color": return { vertex: screen, fragment: source(display) };
-      default: return { vertex, fragment: source(opaque) };
-    }
+  private resolveInspection(effects = this.state.activeEffects()) {
+    return this.inspection.resolve(this.buffer, {
+      effects, refractionProgram: this.state.side === "A" ? this.refractionA : this.refractionB,
+    });
+  }
+
+  // UI reads expose no GPU resources and perform no rendering.
+  inspected() {
+    const { info, shader } = this.resolveInspection();
+    return { info, shader };
   }
 
   private attachRigs(rigs: SceneAssets["rigs"]): RevoluteJoint[] {
@@ -314,6 +276,8 @@ export class MillLab {
   render(width: number, height: number) {
     const { state, camera, gpu } = this;
     const fx = state.activeEffects();
+    const view = this.resolveInspection(fx);
+    const work = view.work.scene;
     const size = Math.min(1, 1200 / width);
     gpu.resize(Math.max(2, Math.round(width * size)), Math.max(2, Math.round(height * size)));
     const pose = state.pose();
@@ -355,7 +319,7 @@ export class MillLab {
     this.lightingUniforms.metalness!.value = fx.metalness;
     this.lightingUniforms.useRim!.value = !!fx.rim;
     this.lightingUniforms.useCel!.value = !!fx.cel;
-    this.surfaceControls.deferred.value = applyDeferred && this.buffer !== "Forward color";
+    this.surfaceControls.deferred.value = applyDeferred && !work.forward;
     this.surfaceControls.textureMode.value = fx.texture;
     this.surfaceControls.normalMode.value = fx.normals;
     this.surfaceControls.ripples.value = !!fx.ripples;
@@ -364,7 +328,7 @@ export class MillLab {
     this.waterTime.value = state.waterTime;
     this.updateParts();
 
-    if (fx.shadows || this.buffer === "Shadow map") {
+    if (fx.shadows || work.shadow) {
       if (this.swatch) this.swatch.visible = false;
       for (const part of this.parts) part.mesh.material = part.shadow;
       gpu.renderer.setRenderTarget(this.shadowTarget);
@@ -374,8 +338,8 @@ export class MillLab {
     }
     gpu.renderer.setRenderTarget(this.opaqueTarget);
     gpu.renderer.render(this.scene, camera);
-    if (applyDeferred || this.buffer === "Deferred color") gpu.draw(this.deferredPass, this.deferredTarget);
-    if (fx.ao || this.buffer.startsWith("SSAO")) {
+    if (applyDeferred || work.deferred) gpu.draw(this.deferredPass, this.deferredTarget);
+    if (fx.ao || work.ao) {
       gpu.draw(this.aoPass, this.aoRaw);
       gpu.draw(this.aoFilterPass, this.aoSmooth);
     }
@@ -393,56 +357,18 @@ export class MillLab {
     this.compositePass.uniforms.fresnel!.value = !!fx.fresnel;
     this.compositePass.uniforms.foamDepth!.value = fx.foam ? fx.foamDepth : 0;
     gpu.draw(this.compositePass, this.compositeTarget);
-    const output = this.post.render(this.compositeTarget.texture, fx, state, daylight, this.buffer);
+    const output = this.post.render(this.compositeTarget.texture, fx, state, daylight, view.work.post);
     this.focusUV.fromArray(state.focus);
     this.displayPass.uniforms.encoding!.value = fx.encoding;
     this.displayPass.uniforms.aberration!.value = fx.chromatic;
     this.displayPass.uniforms.fringe!.value = fx.fringe;
-    this.show(output);
+    this.show(view, output);
   }
 
-  private show(output: Texture) {
-    const opaque = this.opaqueTarget;
-    const hit = this.hitTarget.texture;
-    const deferred = !!this.state.activeEffects().deferred;
-    const lighting = deferred ? this.deferredTarget.textures[1]! : opaque.textures[3]!;
-    let input: Texture = this.compositeTarget.texture;
-    let style = 0;
-    if (this.buffer === "Final color") { input = output; style = 9; }
-    if (isPostBuffer(this.buffer)) {
-      const view = this.post.view(this.buffer, this.state.activeEffects());
-      input = view.texture;
-      style = view.style;
-    }
-    switch (this.buffer) {
-      case "Opaque color": input = deferred ? this.deferredTarget.texture : opaque.textures[2]!; break;
-      case "Forward color": input = opaque.textures[2]!; break;
-      case "Deferred color": input = this.deferredTarget.texture; break;
-      case "Shadow map": input = this.shadowTarget.depthTexture!; style = 2; break;
-      case "Specular": input = lighting; break;
-      case "Shadow visibility": input = lighting; style = 4; break;
-      case "SSAO raw": input = this.aoRaw.texture; style = 1; break;
-      case "SSAO filtered": input = this.aoSmooth.texture; style = 1; break;
-      case "Reflection mask": input = this.reflectionTarget.texture; style = 4; break;
-      case "Reflection hit UV": input = this.reflectionTarget.texture; style = 3; break;
-      case "Reflection color": input = this.compositeTarget.textures[2]!; break;
-      case "Refracted color": input = this.compositeTarget.textures[1]!; break;
-      case "Fresnel weight": input = this.compositeTarget.textures[3]!; style = 4; break;
-      case "Foam": input = this.compositeTarget.textures[3]!; style = 1; break;
-      case "Flow direction": input = this.waterTarget.textures[2]!; style = 7; break;
-      case "Flow UV": input = this.waterTarget.textures[2]!; style = 8; break;
-      case "Water depth": input = this.waterTarget.depthTexture!; style = 5; break;
-      case "Albedo": input = opaque.textures[0]!; break;
-      case "Encoded normals": input = opaque.textures[1]!; style = 1; break;
-      case "Raw depth": input = opaque.depthTexture!; style = 2; break;
-      case "Linear depth": input = opaque.depthTexture!; style = 5; break;
-      case "View position": input = opaque.depthTexture!; style = 6; break;
-      case "Water mask": input = hit; style = 4; break;
-      case "Refraction hit UV": input = hit; style = 3; break;
-      case "Water normals": input = this.waterTarget.textures[0]!; style = 1; break;
-    }
-    this.displayPass.uniforms.source!.value = input;
-    this.displayPass.uniforms.style!.value = style;
+  private show(view: ResolvedView, output: Texture) {
+    const image = view.image(output);
+    this.displayPass.uniforms.source!.value = image.texture;
+    this.displayPass.uniforms.style!.value = image.style;
     this.gpu.draw(this.displayPass, null);
   }
 

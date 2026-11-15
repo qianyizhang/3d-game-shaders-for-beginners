@@ -1,6 +1,7 @@
 import { loadAssets } from "./assets";
 import { GPU } from "./gpu";
-import { MillLab, buffers, defaultEdit, type BufferName } from "./lab";
+import { MillLab, defaultEdit } from "./lab";
+import { inspectionCatalog, inspectionGroups, type BufferName } from "./inspection";
 import type { Effect } from "./effects";
 import { effectPanel, firstLesson, lessons, practiceLessons, waterlineLesson, type Control, type Lesson } from "./lessons";
 import { bookmarks, type Bookmark, type CameraPose } from "./state";
@@ -46,17 +47,21 @@ async function start() {
   };
   const labelClock = () => { byId("clock").textContent = `Frame ${state.frame} · ${state.time.toFixed(2)} s`; };
   const labelPlayback = () => { byId("play").textContent = state.playing ? "Pause" : "Play"; };
-  const updateCode = () => {
-    if (!(byId<HTMLDetailsElement>("shader-code").open)) return;
-    const stage = byId<HTMLSelectElement>("shader-stage").value === "vertex" ? "vertex" : "fragment";
-    byId("code").textContent = "#version 300 es\n" + lab.code()[stage];
+  const refreshInspection = () => {
+    const { info, shader } = lab.inspected();
+    byId("chain").textContent = `${info.producer} → ${info.consumer}`;
+    byId("description").textContent = info.description;
+    byId("view-label").textContent = `${state.side} · ${info.name}`;
+    if (byId<HTMLDetailsElement>("shader-code").open) {
+      const stage = byId<HTMLSelectElement>("shader-stage").value === "vertex" ? "vertex" : "fragment";
+      byId("code").textContent = "#version 300 es\n" + shader[stage];
+    }
   };
   const syncSide = () => {
     const side = state.side;
     byId("side-a").setAttribute("aria-pressed", String(side === "A"));
     byId("side-b").setAttribute("aria-pressed", String(side === "B"));
-    byId("view-label").textContent = `${side} · ${buffer.value}`;
-    updateCode();
+    refreshInspection();
     paint();
   };
   const play = () => {
@@ -94,36 +99,22 @@ async function start() {
   function inspect(value: BufferName) {
     lab.selectBuffer(value);
     buffer.value = value;
-    const [producer, consumer, description] = buffers[value];
-    byId("chain").textContent = `${producer} → ${consumer}`;
-    byId("description").textContent = description;
-    byId("view-label").textContent = `${state.side} · ${value}`;
-    updateCode();
+    refreshInspection();
     paint();
   }
   const buffer = byId<HTMLSelectElement>("buffer");
-  const groups: [string, (name: BufferName) => boolean][] = [
-    ["Output", name => /^(Final color|Display linear|Graded linear)$/.test(name)],
-    ["Geometry", name => /^(Albedo|Encoded normals|Raw depth|Linear depth|View position|Water depth)$/.test(name)],
-    ["Water", name => /^(Water (?!depth)|Refraction|Refract|Reflect|Fresnel|Foam|Flow)/.test(name)],
-    ["Lighting and AO", name => /^(Opaque|Forward|Deferred|Shadow|Specular|SSAO)/.test(name)],
-    ["Focus and motion", name => /^(Focus|Blurred|Dilated|Depth of field|Motion)/.test(name)],
-    ["Image effects", () => true],
-  ];
-  const names = waterlineOnly ? sceneLesson.views : Object.keys(buffers) as BufferName[];
-  const assigned = new Set<BufferName>();
-  for (const [title, contains] of groups) {
+  const names = waterlineOnly ? sceneLesson.views : inspectionCatalog.map(view => view.name);
+  for (const title of inspectionGroups) {
     const group = document.createElement("optgroup");
     group.label = title;
-    for (const name of names) if (!assigned.has(name) && contains(name)) {
-      assigned.add(name);
+    for (const name of names) if (inspectionCatalog.find(view => view.name === name)!.group === title) {
       group.append(new Option(name, name));
     }
     if (group.children.length) buffer.add(group);
   }
   buffer.onchange = () => { const name = names.find(value => value === buffer.value); if (name) inspect(name); };
-  byId<HTMLDetailsElement>("shader-code").ontoggle = updateCode;
-  byId<HTMLSelectElement>("shader-stage").onchange = updateCode;
+  byId<HTMLDetailsElement>("shader-code").ontoggle = refreshInspection;
+  byId<HTMLSelectElement>("shader-stage").onchange = refreshInspection;
 
   const toggles = ["flow", "wheel", "props"] as const;
   for (const key of toggles) {

@@ -41,7 +41,7 @@ From `mill-shader-lab/`, after setup:
 npm test
 ```
 
-This first runs the comparison-state transition tests, then builds the lab,
+This first runs the buffer-inspection and comparison-state tests, then builds the lab,
 starts a temporary loopback preview, and runs the
 20 lessons in headless Chrome with a disposable profile. The test blocks
 off-origin app requests; it needs no internet, native SDK, or running server
@@ -55,6 +55,12 @@ For the [lesson comparison state seam](lesson-comparison-state.md),
 assets. It checks reset, partial references, frozen poses, rejection without
 mutation, sweep sequencing, scene staging and read isolation. These tests do
 not replace the rendering and interaction checks above.
+
+For the [buffer inspection seam](buffer-inspection.md), `npm run test:inspection`
+checks current shader/attachment selection, HDR fallback, display channels,
+inspection-only work and missing-attachment failure/recovery without drawing.
+The full browser gate also checks live explanations and source/image agreement,
+including disabled effects, A/B edits and HDR/SDR bloom.
 
 After [preparing the scene kits](scene-gallery.md#run-locally), run
 `python3.12 test/dcc_adapter.py` and `npm run build && node test/scene-lessons.mjs`

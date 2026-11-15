@@ -1,5 +1,6 @@
 import { Vector2, Vector3, type Matrix4, type PerspectiveCamera, type Texture, type WebGLRenderTarget } from "three";
 import type { SceneAssets } from "./assets";
+import type { PostInspectionResources, PostInspectionWork } from "./inspection";
 import type { Effects } from "./effects";
 import { GPU, u } from "./gpu";
 import type { LabState } from "./state";
@@ -11,31 +12,6 @@ import motion from "./shaders/motion.frag?raw";
 import bloom from "./shaders/bloom.frag?raw";
 import color from "./shaders/color-effects.frag?raw";
 
-export const postBuffers = {
-  "Fog amount": ["Atmosphere", "Scene color", "Opacity of the native-style near/far ramp or exponential fog."],
-  "Smoke mask": ["Atmosphere", "Inspector", "Smoke opacity after scene depth clips the plume. Black means clear; brighter means more smoke."],
-  "Outline edges": ["Outline detection", "Scene color", "Position differences or depth and normal discontinuities."],
-  "Focus / blur mask": ["Depth of field", "Focus composite", "Black stays sharp. White uses the blurred source."],
-  "Blurred source": ["Gaussian blur", "Depth of field", "Blurred scene before dilation; watch foreground color bleed over a depth edge."],
-  "Dilated source": ["Depth-guided dilation", "Gaussian blur", "Far colors extended under foreground edges before blurring."],
-  "Dilated blur": ["Gaussian blur of dilated source", "Depth of field", "Compare this with Blurred source at a near silhouette."],
-  "Depth of field": ["Focus composite", "Post processing", "Sharp and blurred inputs mixed by the focus mask."],
-  "Motion direction": ["Camera reprojection", "Motion blur", "Neutral red/green means still. Offsets encode signed UV motion from the previous camera."],
-  "Motion blur": ["Camera reprojection sampling", "Post processing", "Samples along the current-to-previous pixel direction. No object velocity is stored."],
-  "Filtered color": ["Spatial filter", "Color effects", "Box, separable Gaussian or low-variance Kuwahara sampling."],
-  "Bloom extraction": ["Threshold / bright-pass", "Bloom blur or add", "Legacy averages thresholded neighbors. HDR stores the excess above linear white at half resolution."],
-  "Bloom blur": ["Half-resolution Gaussian blur", "Bloom add", "HDR highlight energy spread in horizontal and vertical passes."],
-  "Bloom combined": ["Bloom add", "Tone mapping", "Linear scene radiance plus the bloom layer."],
-  "Display linear": ["Tone and image effects", "LUT / split toning", "Display-range linear RGB before grading and output encoding."],
-  "Graded linear": ["LUT / split toning", "Output encoding", "Linear result of the grade. The LUT pass decodes the table result back to linear."],
-} as const;
-export type PostBuffer = keyof typeof postBuffers;
-
-export function isPostBuffer(name: string): name is PostBuffer {
-  return Object.hasOwn(postBuffers, name);
-}
-
-type View = { target: WebGLRenderTarget; fragment: string; slot?: number; style?: number };
 const horizontal = new Vector2(1, 0), vertical = new Vector2(0, 1);
 
 export class Post {
@@ -62,7 +38,7 @@ export class Post {
   private readonly scratch;
   private readonly halfScratch;
   private readonly focusUV = new Vector2();
-  private readonly views: Record<PostBuffer, View>;
+  readonly inspectionResources: PostInspectionResources;
 
   constructor(
     private readonly gpu: GPU, camera: PerspectiveCamera, assets: SceneAssets,
@@ -115,31 +91,13 @@ export class Post {
       daylight: u(1), toneMap: u(false), grayRamp: u(false), levels: u(0), posterStyle: u(0), blockSize: u(0), pixelBackground: u(true),
       sharpness: u(0), grainAmount: u(0), frame: u(0), grade: u(0),
     });
-    this.views = {
-      "Fog amount": { target: this.atmosTarget, fragment: atmosphere, slot: 1, style: 1 },
-      "Smoke mask": { target: this.atmosTarget, fragment: atmosphere, slot: 2, style: 1 },
-      "Outline edges": { target: this.edgeTarget, fragment: edges, slot: 1, style: 1 },
-      "Focus / blur mask": { target: this.focusTarget, fragment: focus, slot: 1, style: 1 },
-      "Blurred source": { target: this.blurred, fragment: filters },
-      "Dilated source": { target: this.dilated, fragment: focus },
-      "Dilated blur": { target: this.dilatedBlur, fragment: filters },
-      "Depth of field": { target: this.focusTarget, fragment: focus },
-      "Motion direction": { target: this.motionTarget, fragment: motion, slot: 1, style: 1 },
-      "Motion blur": { target: this.motionTarget, fragment: motion },
-      "Filtered color": { target: this.filterTarget, fragment: filters },
-      "Bloom extraction": { target: this.bright, fragment: bloom },
-      "Bloom blur": { target: this.bloomBlur, fragment: filters },
-      "Bloom combined": { target: this.combined, fragment: bloom },
-      "Display linear": { target: this.colorTarget, fragment: color, slot: 1, style: 1 },
-      "Graded linear": { target: this.colorTarget, fragment: color, style: 1 },
+    this.inspectionResources = {
+      atmosphere: this.atmosTarget, edge: this.edgeTarget, filter: this.filterTarget,
+      dilated: this.dilated, blurred: this.blurred, dilatedBlur: this.dilatedBlur,
+      focus: this.focusTarget, motion: this.motionTarget, bright: this.bright,
+      legacyBright: this.legacyBright, bloomBlur: this.bloomBlur,
+      combined: this.combined, color: this.colorTarget,
     };
-  }
-
-  view(name: PostBuffer, fx: Effects) {
-    const view = this.views[name];
-    const target = name === "Bloom extraction" && (fx.bloom !== 2 || !this.gpu.hdr)
-      ? this.legacyBright : view.target;
-    return { texture: target.textures[view.slot ?? 0]!, style: view.style ?? 0, fragment: view.fragment };
   }
 
   private imageFilter(input: Texture, target: WebGLRenderTarget, radius: number, mode: number, axis = horizontal) {
@@ -157,10 +115,10 @@ export class Post {
     this.imageFilter(scratch.texture, output, radius, 2, vertical);
   }
 
-  render(input: Texture, fx: Effects, state: LabState, daylight: number, view: string) {
+  render(input: Texture, fx: Effects, state: LabState, daylight: number, work: PostInspectionWork) {
     const gpu = this.gpu;
     this.focusUV.fromArray(state.focus);
-    if (fx.fog || fx.smoke || view === "Fog amount" || view === "Smoke mask") {
+    if (fx.fog || fx.smoke || work.atmosphere) {
       const a = this.atmosphere.uniforms;
       a.inputColor!.value = input;
       a.daylight!.value = daylight;
@@ -173,7 +131,7 @@ export class Post {
       gpu.draw(this.atmosphere, this.atmosTarget);
       input = this.atmosTarget.texture;
     }
-    if (fx.outline || view === "Outline edges") {
+    if (fx.outline || work.outline) {
       const e = this.edge.uniforms;
       e.inputColor!.value = input;
       e.mode!.value = fx.outline;
@@ -181,43 +139,43 @@ export class Post {
       gpu.draw(this.edge, this.edgeTarget);
       if (fx.outline) input = this.edgeTarget.texture;
     }
-    if (fx.dof || ["Focus / blur mask", "Blurred source", "Dilated source", "Dilated blur", "Depth of field"].includes(view)) {
+    if (fx.dof || work.focus) {
       const f = this.focus.uniforms;
       f.inputColor!.value = input;
       f.aperture!.value = fx.aperture;
       f.focusFallback!.value = state.orbit.radius;
-      if (fx.dilation || view === "Dilated source" || view === "Dilated blur") {
+      if (fx.dilation || work.dilation) {
         f.mode!.value = 0;
         f.blurred!.value = input;
         gpu.draw(this.focus, this.dilated);
         this.gaussian(this.dilated.texture, this.dilatedBlur, 1.6);
       }
-      if (!fx.dilation || view === "Blurred source") this.gaussian(input, this.blurred, 1.6);
+      if (!fx.dilation || work.blurred) this.gaussian(input, this.blurred, 1.6);
       f.mode!.value = 1;
       f.blurred!.value = fx.dilation ? this.dilatedBlur.texture : this.blurred.texture;
       gpu.draw(this.focus, this.focusTarget);
       if (fx.dof) input = this.focusTarget.texture;
     }
-    if (fx.motion || view === "Motion direction" || view === "Motion blur") {
+    if (fx.motion || work.motion) {
       this.motion.uniforms.inputColor!.value = input;
       this.motion.uniforms.strength!.value = fx.motion && state.sweepFrame !== null ? fx.motionStrength : 0;
       gpu.draw(this.motion, this.motionTarget);
       if (fx.motion) input = this.motionTarget.texture;
     }
-    if (fx.filter || view === "Filtered color") {
+    if (fx.filter || work.filter) {
       if (fx.filter === 2) this.gaussian(input, this.filterTarget, fx.blurSize);
       else this.imageFilter(input, this.filterTarget, fx.blurSize, fx.filter);
       if (fx.filter) input = this.filterTarget.texture;
     }
     const hdrBloom = fx.bloom === 2 && gpu.hdr;
-    if (fx.bloom || view.startsWith("Bloom")) {
+    if (fx.bloom || work.bloom) {
       const b = this.bloom.uniforms;
       b.inputColor!.value = input;
       b.bloomTexture!.value = input;
       b.mode!.value = hdrBloom ? 0 : 1;
       const extracted = hdrBloom ? this.bright : this.legacyBright;
       gpu.draw(this.bloom, extracted);
-      if (hdrBloom || view === "Bloom blur") this.gaussian(extracted.texture, this.bloomBlur, 1, true);
+      if (hdrBloom || work.bloomBlur) this.gaussian(extracted.texture, this.bloomBlur, 1, true);
       b.mode!.value = 2;
       b.strength!.value = fx.bloomStrength;
       b.bloomTexture!.value = hdrBloom ? this.bloomBlur.texture : extracted.texture;
