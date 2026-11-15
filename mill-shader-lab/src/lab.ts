@@ -106,7 +106,9 @@ export class MillLab {
 
   constructor(canvas: HTMLCanvasElement, assets: SceneAssets, gpu: GPU) {
     this.name = assets.name;
-    this.state = new LabState(assets.waterline, assets.practice);
+    this.state = new LabState(assets.waterline, assets.practice, {
+      hdr: gpu.hdr, jointLimits: assets.rigs.flatMap(rig => rig.joints.map(joint => joint.poseLimit)),
+    });
     this.gpu = gpu;
     this.audio = assets.audio.map(src => {
       const player = new Audio(src);
@@ -465,7 +467,7 @@ export class MillLab {
     this.raycaster.setFromCamera(new Vector2(x * 2 - 1, y * 2 - 1), this.camera);
     const hit = this.raycaster.intersectObject(this.scene, true).find(candidate => candidate.object.visible);
     if (!hit) return null;
-    this.state.focus = [x, y];
+    this.state.setFocus(x, y);
     const local = hit.object.worldToLocal(hit.point.clone());
     const view = hit.point.clone().applyMatrix4(this.camera.matrixWorldInverse);
     return { object: hit.object.name, local, world: hit.point, view, screen: view.clone().applyMatrix4(this.camera.projectionMatrix) };

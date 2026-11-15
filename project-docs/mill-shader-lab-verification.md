@@ -41,13 +41,20 @@ From `mill-shader-lab/`, after setup:
 npm test
 ```
 
-This builds the lab, starts a temporary loopback preview, and runs the
+This first runs the comparison-state transition tests, then builds the lab,
+starts a temporary loopback preview, and runs the
 20 lessons in headless Chrome with a disposable profile. The test blocks
 off-origin app requests; it needs no internet, native SDK, or running server
 after the npm dependencies and original asset conversion are in place. It
 checks rendered pixels, shader edit recovery, audio, GPU and asset failure
 paths, keyboard controls, and Chrome touch emulation at 360 CSS pixels.
 Screenshots stay in memory during routine runs.
+
+For the [lesson comparison state seam](lesson-comparison-state.md),
+`npm run test:state` runs the production state operations without a browser or
+assets. It checks reset, partial references, frozen poses, rejection without
+mutation, sweep sequencing, scene staging and read isolation. These tests do
+not replace the rendering and interaction checks above.
 
 After [preparing the scene kits](scene-gallery.md#run-locally), run
 `python3.12 test/dcc_adapter.py` and `npm run build && node test/scene-lessons.mjs`

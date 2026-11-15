@@ -1,7 +1,7 @@
 import { loadAssets } from "./assets";
 import { GPU } from "./gpu";
 import { MillLab, buffers, defaultEdit, type BufferName } from "./lab";
-import { defaults, type Effect } from "./effects";
+import type { Effect } from "./effects";
 import { effectPanel, firstLesson, lessons, practiceLessons, waterlineLesson, type Control, type Lesson } from "./lessons";
 import { bookmarks, type Bookmark, type CameraPose } from "./state";
 
@@ -36,8 +36,6 @@ async function start() {
   let dirty = true;
   let lost = false;
   let lesson: Lesson = sceneLesson;
-  let sweeping = false;
-  let sweepStart = 0;
   const paint = () => { dirty = true; };
   const button = (key: string, action: () => void) => { byId<HTMLButtonElement>(key).onclick = action; };
   const select = <T extends string>(key: string, values: readonly T[], action: (value: T) => void) => {
@@ -53,8 +51,8 @@ async function start() {
     const stage = byId<HTMLSelectElement>("shader-stage").value === "vertex" ? "vertex" : "fragment";
     byId("code").textContent = "#version 300 es\n" + lab.code()[stage];
   };
-  const updateSide = (side: "A" | "B") => {
-    state.side = side;
+  const syncSide = () => {
+    const side = state.side;
     byId("side-a").setAttribute("aria-pressed", String(side === "A"));
     byId("side-b").setAttribute("aria-pressed", String(side === "B"));
     byId("view-label").textContent = `${side} · ${buffer.value}`;
@@ -62,8 +60,7 @@ async function start() {
     paint();
   };
   const play = () => {
-    if (state.jointPose) return;
-    state.playing = !state.playing;
+    state.togglePlayback();
     labelPlayback();
   };
   const sun = byId<HTMLInputElement>("sun");
@@ -73,23 +70,26 @@ async function start() {
   const point = byId("point");
 
   const updateSun = (value: number) => {
-    state.sun = value;
-    if (state.props) state.shutterSun = value;
+    if (!state.setSun(value).applied) return;
     sun.value = String(value);
     byId("sun-value").textContent = `${value}°`;
     paint();
   };
   const bookmark = select("bookmark", waterlineOnly ? ["Waterline"] : Object.keys(bookmarks) as Bookmark[], open);
   function open(name: Bookmark, entryPose?: CameraPose) {
-    sweeping = false;
-    state.open(name, entryPose);
-    bookmark.value = name;
-    byId("stage-title").textContent = name;
+    if (!state.openBookmark(name, entryPose).applied) return;
+    syncBookmark();
+  }
+  function syncBookmark() {
+    bookmark.value = state.bookmark;
+    byId("stage-title").textContent = state.bookmark;
     marker.hidden = true;
     point.hidden = true;
-    updateSun(state.sun);
+    sun.value = String(state.sun);
+    byId("sun-value").textContent = `${state.sun}°`;
     labelPlayback();
     labelClock();
+    paint();
   }
   function inspect(value: BufferName) {
     lab.selectBuffer(value);
@@ -128,10 +128,10 @@ async function start() {
   const toggles = ["flow", "wheel", "props"] as const;
   for (const key of toggles) {
     const control = byId<HTMLInputElement>(key);
-    control.onchange = () => { state[key] = control.checked; if (key === "props" && control.checked) state.shutterSun = state.sun; paint(); };
+    control.onchange = () => { state.setAnimation(key, control.checked); paint(); };
   }
   const legacyLink = byId<HTMLInputElement>("legacy-link");
-  legacyLink.onchange = () => { state.legacyLink = legacyLink.checked; };
+  legacyLink.onchange = () => { state.setAnimation("legacyLink", legacyLink.checked); };
   sun.oninput = () => updateSun(sun.valueAsNumber);
 
   const syncers = new Map<Effect, Set<() => void>>();
@@ -140,11 +140,10 @@ async function start() {
     const label = document.createElement("label");
     let refresh: () => void;
     const edit = (value: number) => {
-      state.effects[key] = value;
-      state.playing = false;
+      if (!state.editEffect(key, value).applied) { refresh(); return; }
       labelPlayback();
       for (const sync of syncers.get(key) ?? []) sync();
-      updateSide("B");
+      syncSide();
     };
     if ("choices" in def) {
       label.className = "stack";
@@ -228,23 +227,26 @@ async function start() {
     if (!joint) return;
     poseAngle.min = String(-joint.poseLimit);
     poseAngle.max = String(joint.poseLimit);
-    const angle = state.jointPose?.experiment[index] ?? 0;
+    const angle = state.experimentOffset(index);
     poseAngle.value = String(angle);
     poseAngle.setAttribute("aria-valuetext", `${angle} degrees`);
     byId("pose-value").textContent = `${angle}°`;
   }
   function updatePoseControls(message?: string) {
     const posing = lesson.action === "pose";
-    const frozen = !!state.jointPose;
+    const comparison = state.snapshot();
+    const frozen = comparison.jointPose !== undefined;
+    const available = comparison.availability;
     byId("pose-controls").hidden = !posing;
     byId("pose-edit").hidden = !frozen;
     byId("freeze-pose").textContent = frozen ? "Unfreeze frame" : "Freeze frame";
     byId("pose-status").textContent = message ?? (frozen ?
-      `Frame ${state.frame} frozen. Unfreezing clears the pose edits.` : "Freeze the frame to edit joints.");
-    for (const key of ["play", "step", "overview"]) byId<HTMLButtonElement>(key).disabled = frozen;
-    bookmark.disabled = frozen;
+      `Frame ${comparison.frame} frozen. Unfreezing clears the pose edits.` : "Freeze the frame to edit joints.");
+    for (const key of ["play", "step"]) byId<HTMLButtonElement>(key).disabled = !available.playback;
+    byId<HTMLButtonElement>("overview").disabled = !available.bookmark;
+    bookmark.disabled = !available.bookmark;
     const pin = byId<HTMLButtonElement>("pin-a");
-    pin.disabled = posing ? !frozen : !lesson.controls?.length;
+    pin.disabled = !available.pinReference;
     pin.textContent = posing ? "Save B as A" : "Pin controls as A";
     updateJoint();
     labelPlayback();
@@ -252,30 +254,28 @@ async function start() {
   jointSelect.onchange = updateJoint;
   poseAngle.oninput = () => {
     const joint = jointSelect.selectedIndex;
-    if (!state.jointPose || !joints[joint]) return;
-    state.jointPose.experiment[joint] = poseAngle.valueAsNumber;
+    state.editJoint(joint, poseAngle.valueAsNumber);
     updateJoint();
-    updateSide("B");
+    syncSide();
   };
   button("freeze-pose", () => {
-    if (state.jointPose) state.jointPose = undefined;
-    else state.freezePose(joints.length);
+    if (state.frozen) state.unfreezePose();
+    else state.freezePose();
     updatePoseControls();
-    updateSide("B");
+    syncSide();
   });
   function openLesson(next: Lesson) {
+    state.enterLesson(next);
+    presentLesson(next);
+  }
+  function presentLesson(next: Lesson) {
     lesson = next;
-    state.jointPose = undefined;
     const widest = Math.max(...joints.map(joint => joint.poseLimit));
     jointSelect.selectedIndex = joints.findIndex(joint => joint.poseLimit === widest);
     lessonSelect.value = next.id;
     byId("lesson-title").textContent = next.title;
     byId("lesson-task").textContent = next.task;
     byId("compare-caption").textContent = next.comparison;
-    state.effects = { ...defaults, ...next.initial };
-    if (!gpu.hdr && state.effects.bloom === 2) state.effects.bloom = 1;
-    state.baseline = { ...next.reference };
-    state.flow = state.wheel = state.props = state.legacyLink = true;
     lab.resetEdit();
     bend.value = defaultEdit;
     compile.textContent = "";
@@ -299,33 +299,30 @@ async function start() {
     }), action("Restore pond view", () => open("Across the pond")));
     if (next.action === "sweep") {
       actions.append(action("Replay sweep", () => {
-        state.playing = false; labelPlayback(); state.sweepFrame = 0;
-        sweeping = true; sweepStart = performance.now(); paint();
+        state.replaySweep(performance.now()); labelPlayback(); paint();
       }), action("Hold sweep frame", () => {
-        sweeping = false; state.sweepFrame = state.sweepFrame && state.sweepFrame > 0 ? state.sweepFrame : 16; paint();
-      }), action("Stopped camera", () => { stopSweep(); paint(); }));
+        state.holdSweep(); paint();
+      }), action("Stopped camera", () => { state.stopSweep(); paint(); }));
     }
     syncEffects();
-    open(next.scene);
+    syncBookmark();
     updatePoseControls();
     inspect("Final color");
-    updateSide("B");
+    syncSide();
   }
   button("pin-a", () => {
-    if (lesson.action === "pose" && state.jointPose) {
-      state.pinPose();
+    if (!state.pinReference().applied) return;
+    if (lesson.action === "pose") {
       updatePoseControls(`B saved as A at frame ${state.frame}. Change a joint in B to compare.`);
-      updateSide("B");
+      syncSide();
       return;
     }
-    const keys = new Set<Effect>([...Object.keys(lesson.reference) as Effect[], ...(lesson.controls ?? []).map(def => def.key)]);
-    state.baseline = Object.fromEntries([...keys].map(key => [key, state.effects[key]]));
     byId("compare-caption").textContent = "A holds these lesson controls at the pinned values. Both sides share the camera, clock and other effects.";
-    state.playing = false; labelPlayback(); updateSide("B");
+    labelPlayback(); syncSide();
   });
   button("legacy", () => {
-    state.useLegacy(); syncEffects();
-    open("Overview"); updateSide("B"); inspect("Final color");
+    if (!state.useLegacy().applied) return;
+    syncEffects(); syncBookmark(); syncSide(); inspect("Final color");
   });
   const sound = byId<HTMLInputElement>("sound");
   sound.onchange = () => {
@@ -340,7 +337,7 @@ async function start() {
   button("midnight", () => updateSun(90));
   button("play", play);
   button("step", () => {
-    state.playing = false; labelPlayback(); state.step(1 / 60); labelClock(); paint();
+    state.stepFrame(); labelPlayback(); labelClock(); paint();
   });
   button("overview", () => open(waterlineOnly ? "Waterline" : "Overview"));
   canvas.setAttribute("aria-label", `${assets.name} scene`);
@@ -357,20 +354,21 @@ async function start() {
     lessonSelect.closest("label")!.hidden = true;
     byId("overview").textContent = "Restore Waterline";
   }
-  button("side-a", () => { state.playing = false; sweeping = false; labelPlayback(); updateSide("A"); });
-  button("side-b", () => { state.playing = false; sweeping = false; labelPlayback(); updateSide("B"); });
+  button("side-a", () => { state.selectSide("A"); labelPlayback(); syncSide(); });
+  button("side-b", () => { state.selectSide("B"); labelPlayback(); syncSide(); });
   button("apply", () => {
+    if (!state.availability().shaderEdit) return;
     try {
       lab.edit(bend.value);
       compile.dataset.error = "false";
       compile.textContent = "Compiled. The new expression is active in B.";
-      state.playing = false; labelPlayback(); updateSide("B");
+      state.shaderEditApplied(); labelPlayback(); syncSide();
     } catch (error) {
       compile.dataset.error = "true";
       compile.textContent = `Last working shader kept.\n${error instanceof Error ? error.message : String(error)}`;
     }
   });
-  button("reset", () => openLesson(lesson));
+  button("reset", () => { if (state.resetLesson().applied) presentLesson(lesson); });
 
   const zoom = (factor: number) => {
     const legacyWide = !practice && (state.bookmark === "Overview" || state.bookmark === "Camera sweep");
@@ -473,23 +471,12 @@ async function start() {
     void lab.sound(false);
     showFailure(new Error("The browser lost its GPU context. Retry to reload the scene."));
   });
-  function stopSweep() {
-    sweeping = false;
-    if (state.sweepFrame !== null) state.sweepOffset = state.sweepFrame * 0.008;
-    state.sweepFrame = null;
-  }
   let last = performance.now();
   function frame(now: number) {
     if (lost) return;
     try {
-      if (sweeping) {
-        const step = Math.floor((now - sweepStart) / 42);
-        if (step < 48) state.sweepFrame = step;
-        else { stopSweep(); }
-        dirty = true;
-      }
-      if (state.playing) {
-        state.step(Math.max(0, Math.min(0.05, (now - last) / 1000)));
+      const advanced = state.advance(now, (now - last) / 1000);
+      if (advanced.applied && advanced.changed) {
         labelClock();
         dirty = true;
       }

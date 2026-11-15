@@ -221,7 +221,7 @@ export function practiceLessons(subject: string | undefined, hasRigs: boolean): 
   });
 }
 
-export const effectPanel = [
+export const effectPanel: readonly Control[] = [
   choose("texture", "Surface color"), choose("normals", "Normal source"), choose("lighting", "Lighting model"),
   toggle("shadows", "Shadows"), toggle("fresnel", "Fresnel"), toggle("rim", "Rim"),
   toggle("cel", "Cel bands"), toggle("deferred", "Deferred"), toggle("ao", "SSAO"),

@@ -32,6 +32,15 @@ export async function waterline({ $, page, check, open, reveal, shot, side, stab
   await $("apply").click();
   assert.match(await $("compile").textContent(), /Last working shader kept.[\s\S]*notAFloat/);
   await samePixels(page, edited, await shot(), "Rejected edit preserves the last working render");
+  await side("a");
+  const reference = await shot();
+  await $("apply").click();
+  assert.equal(await $("side-a").getAttribute("aria-pressed"), "true", "Rejected compilation must not select B");
+  await samePixels(page, reference, await shot(), "Rejected compilation preserves the reference view");
+  await $("play").click();
+  await $("apply").click();
+  assert.equal(await $("play").textContent(), "Pause", "Rejected compilation must not pause playback");
+  await $("play").click();
   await $("reset").click();
   await samePixels(page, stock, await shot(), "Reset restores the stock render");
   const missUV = await view("Refraction hit UV");
