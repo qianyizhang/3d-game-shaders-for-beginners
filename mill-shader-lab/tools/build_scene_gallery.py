@@ -2,6 +2,7 @@
 """Prepare the Lab's local scene assets from pinned DCC deliveries."""
 
 import argparse
+from dataclasses import dataclass
 import json
 from pathlib import Path
 import re
@@ -13,7 +14,7 @@ from scene_gallery_practice_maps import write_resources
 
 LAB = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(LAB.parent))
-from dcc.delivery import default_deliveries, encode, read_release, safe_path  # noqa: E402
+from dcc.delivery import ReleaseRef, VerifiedRelease, delivery_roots, encode, load_release, safe_path  # noqa: E402
 
 ROOT = LAB.parent / ".local/mill-assets/scene-gallery"
 ORDER = ["weather-station", "ferry-landing", "glasshouse", "night-market", "puppet-yard"]
@@ -26,12 +27,27 @@ MATERIAL_NOTES = {
 }
 
 
-def prepare(slug: str, pin: dict, staging: dict, deliveries: Path, root: Path) -> dict:
+@dataclass(frozen=True)
+class SceneInput:
+    slug: str
+    release: VerifiedRelease
+    model: dict
+
+
+def load_scene(slug: str, pin: dict, roots: tuple[Path, ...]) -> SceneInput:
+    if (not isinstance(pin, dict) or not isinstance(pin.get("id"), str)
+            or not isinstance(pin.get("manifestSha256"), str)
+            or any(not isinstance(pin.get(key), list) or not all(isinstance(item, str) for item in pin[key])
+                   for key in ("requiredParts", "requiredJoints"))):
+        raise ValueError(f"{slug}: invalid delivery pin")
     delivery = pin["id"]
     if not re.fullmatch(rf"{re.escape(slug)}-[0-9a-f]{{16}}", delivery):
         raise ValueError(f"{slug}: invalid locked delivery ID")
-    manifest, data = read_release(deliveries / delivery, pin["manifestSha256"])
+    release = load_release(ReleaseRef(delivery, pin["manifestSha256"]), roots=roots)
+    manifest, data = release.manifest, release.files
     model = json.loads(data["scene.json"])
+    if not isinstance(model, dict):
+        raise ValueError(f"{slug}: invalid scene model")
     if manifest["scene"] != slug or model["scene"] != slug or model["axes"] != "y-up":
         raise ValueError(f"{slug}: delivery scene or axes do not match")
     if {m["role"] for m in model["meshes"]} != {"opaque", "water"}:
@@ -52,7 +68,13 @@ def prepare(slug: str, pin: dict, staging: dict, deliveries: Path, root: Path) -
             maps = mesh["textures"]
             if set(maps) != {"color", "normal", "specular", "reflection", "refraction"} or any(path not in data for path in maps.values()):
                 raise ValueError(f"{slug}: missing texture binding for {part['slug']}")
+    return SceneInput(slug, release, model)
 
+
+def prepare(scene: SceneInput, staging: dict, root: Path) -> dict:
+    slug, model, data = scene.slug, scene.model, scene.release.files
+    geo = model["geometry"]
+    contact = model["waterResources"]["contact"]
     target = root / slug
     target.mkdir(parents=True, exist_ok=True)
     for name, content in data.items():
@@ -81,20 +103,24 @@ def prepare(slug: str, pin: dict, staging: dict, deliveries: Path, root: Path) -
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=ROOT)
-    parser.add_argument("--deliveries", type=Path, default=default_deliveries(LAB.parent))
+    parser.add_argument("--deliveries", type=Path, help="Read locked deliveries only from this directory")
     parser.add_argument("scene", nargs="*", choices=None)
     args = parser.parse_args()
     locks = json.loads((LAB / "dcc-lock.json").read_text())
-    if locks["version"] != 1:
+    if not isinstance(locks, dict) or locks.get("version") != 1 or not isinstance(locks.get("scenes"), dict):
         raise ValueError("Unsupported Shader Lab DCC lock version")
     staging = json.loads((LAB / "tools/scene_shots.json").read_text())
-    entries = []
+    roots = delivery_roots(LAB.parent, args.deliveries)
+    inputs = []
     for slug in args.scene or ORDER:
         if slug not in locks["scenes"]:
             raise ValueError(f"{slug}: no DCC delivery pinned")
-        entries.append(prepare(slug, locks["scenes"][slug], staging[slug], args.deliveries, args.output))
+        inputs.append((load_scene(slug, locks["scenes"][slug], roots), staging[slug]))
+    entries = [prepare(scene, settings, args.output) for scene, settings in inputs]
     if not args.scene:
         (args.output / "catalog.json").write_bytes(encode(entries))
+    for scene, _ in inputs:
+        print(f"Delivery {scene.release.manifest['id']}: {scene.release.folder}")
     print(f"Prepared {len(entries)} pinned scene(s) at {args.output}")
 
 

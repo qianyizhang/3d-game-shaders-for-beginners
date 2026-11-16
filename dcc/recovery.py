@@ -16,7 +16,7 @@ from urllib.parse import urlencode
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 import zipfile
 
-from delivery import default_deliveries, digest, encode, read_release, safe_path
+from delivery import ReleaseRef, VerifiedRelease, delivery_roots, digest, encode, load_release, read_release, safe_path
 
 DCC = Path(__file__).resolve().parent
 DEFAULT = DCC.parent / ".local/dcc/remote-backup"
@@ -68,8 +68,36 @@ def texture_archive(textures: dict[str, bytes]) -> bytes:
     return stream.getvalue()
 
 
-def prepare(root: Path, previous: dict, deliveries: Path = DCC / "deliveries") -> dict:
+def prepare(root: Path, previous: dict, deliveries: Path | None = None) -> dict:
     from build import BUILDERS, make_candidate
+
+    index = read_json(DCC / "deliveries/index.json")
+    if not isinstance(index, dict) or index.get("version") != 1 or not isinstance(index.get("scenes"), dict):
+        raise ValueError("Invalid selected delivery index")
+    index = index["scenes"]
+    lock = DCC.parent / "mill-shader-lab/dcc-lock.json"
+    locks = read_json(lock)
+    if not isinstance(locks, dict) or locks.get("version") != 1 or not isinstance(locks.get("scenes"), dict):
+        raise ValueError(f"{lock}: invalid Lab delivery lock")
+    pins = locks["scenes"]
+    required = {}
+    for pin in pins.values():
+        if not isinstance(pin, dict) or not isinstance(pin.get("manifestSha256"), str):
+            raise ValueError("Invalid Lab delivery pin")
+        ref = ReleaseRef(pin["id"], pin["manifestSha256"])
+        prior = required.get(ref.id)
+        if prior and prior.manifest_sha256 is not None and prior.manifest_sha256 != ref.manifest_sha256:
+            raise ValueError(f"{ref.id}: conflicting pinned manifest digests")
+        required[ref.id] = ref
+    # Keep the existing pin-first order so shared texture-pack bytes stay stable.
+    for ref in sorted((ReleaseRef(delivery) for delivery in index.values()), key=lambda ref: ref.id):
+        required.setdefault(ref.id, ref)
+    roots = delivery_roots(DCC.parent, deliveries)
+    releases = [load_release(ref, roots=roots) for ref in required.values()]
+    by_id = {release.manifest["id"]: release for release in releases}
+    for scene, delivery in list(index.items()) + [(scene, pin["id"]) for scene, pin in pins.items()]:
+        if by_id[delivery].manifest["scene"] != scene:
+            raise ValueError(f"{delivery}: delivery does not match required scene {scene}")
 
     plan = dict(version=1, namespace=NAMESPACE, endpoint=BASE, blobs={}, deliveries={}, working={}, masters={})
     textures: dict[str, bytes] = {}
@@ -97,8 +125,8 @@ def prepare(root: Path, previous: dict, deliveries: Path = DCC / "deliveries") -
             checked(path.read_bytes(), sha, len(data))
         return sha
 
-    def add(folder: Path, expected_manifest: str | None = None) -> None:
-        release, files = read_release(folder, expected_manifest)
+    def add(verified: VerifiedRelease) -> None:
+        release, files = verified.manifest, verified.files
         model = json.loads(files["scene.json"])
         geometry = files[model["geometry"]]
         parts = {part["slug"]: part for part in model["parts"]}
@@ -140,21 +168,17 @@ def prepare(root: Path, previous: dict, deliveries: Path = DCC / "deliveries") -
         return sha
 
     # Keep the exact selected and lesson-pinned revisions, as well as the working artwork.
-    index = read_json(DCC / "deliveries/index.json")["scenes"]
     plan["selected"] = index
-    lock = DCC.parent / "mill-shader-lab/dcc-lock.json"
-    pins = read_json(lock)["scenes"] if lock.is_file() else {}
-    for pin in pins.values():
-        add(deliveries / pin["id"], pin["manifestSha256"])
-    for delivery in sorted(set(index.values()) - plan["deliveries"].keys()):
-        add(deliveries / delivery)
+    for release in releases:
+        add(release)
     for slug in BUILDERS:
         candidate = make_candidate(slug, root / "candidates")
-        release, _ = read_release(candidate)
+        verified = load_release(ReleaseRef(candidate.name), roots=(candidate.parent,))
+        release = verified.manifest
         existing = next((key for key, item in plan["deliveries"].items()
                          if item["release"]["scene"] == slug and item["release"]["files"] == release["files"]), None)
         if existing is None:
-            add(candidate)
+            add(verified)
         plan["working"][slug] = existing or release["id"]
     source_root = DCC / "sources"
     source_files = {path.relative_to(DCC).as_posix(): digest(path.read_bytes())
@@ -176,6 +200,8 @@ def prepare(root: Path, previous: dict, deliveries: Path = DCC / "deliveries") -
         pack = blob(texture_archive(textures), "textures", "shared-maps.zip")
         plan["textures"].update({sha: pack for sha in textures})
     put_json(root / "plan.json", plan)
+    for release in releases:
+        print(f"Delivery {release.manifest['id']}: {release.folder}")
     return plan
 
 
@@ -280,7 +306,7 @@ def final_manifest(root: Path) -> dict:
     return plan
 
 
-def require_current_snapshot(work: Path, plan: dict, deliveries: Path = DCC / "deliveries") -> None:
+def require_current_snapshot(work: Path, plan: dict, deliveries: Path | None = None) -> None:
     # A long, rate-limited upload can outlive the working art it began with.
     # Leave its journal intact and require a new prepare if those inputs moved.
     with tempfile.TemporaryDirectory(dir=work) as scratch:
@@ -387,14 +413,13 @@ def main() -> int:
     parser.add_argument("--work", type=Path, default=DEFAULT)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--deliveries", type=Path,
-                        help="Selected and Lab-pinned inputs (default: restored files, then local deliveries)")
+                        help="Read selected and Lab-pinned inputs only from this directory")
     parser.add_argument("--limit", type=int, default=9)
     parser.add_argument("--public-approved", action="store_true", help="Confirm the prepared bytes are cleared for public download")
     args = parser.parse_args()
     if args.action == "prepare":
-        deliveries = args.deliveries or default_deliveries(DCC.parent)
         previous = read_json(RECEIPT) if RECEIPT.is_file() else {}
-        plan = prepare(args.work, previous, deliveries)
+        plan = prepare(args.work, previous, args.deliveries)
         pending = sum("key" not in row for row in plan["blobs"].values())
         print(f"{len(plan['working'])} scenes, {len(plan['deliveries'])} revisions, {pending} new remote files; inspect {args.work / 'plan.json'}")
     elif args.action == "status":
@@ -406,9 +431,8 @@ def main() -> int:
     elif args.action == "record":
         if args.output is None:
             parser.error("record requires a new --output directory for the clean restore")
-        deliveries = args.deliveries or default_deliveries(DCC.parent)
         plan = final_manifest(args.work)
-        require_current_snapshot(args.work, plan, deliveries)
+        require_current_snapshot(args.work, plan, args.deliveries)
         restore(plan, args.output)
         put_json(RECEIPT, plan)
         print(f"Recorded verified recovery at {RECEIPT}")

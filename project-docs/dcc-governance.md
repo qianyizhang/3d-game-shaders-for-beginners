@@ -60,6 +60,10 @@ needed by lessons, then prepares the existing Lab format. The Lab runs
 offline from that bundle. Updating a master does not update the pin. A missing
 payload or incompatible delivery fails preparation with a clear error.
 
+The [delivery selection contract](delivery-selection.md) owns location precedence,
+overrides and failure behavior. Each consumer chooses its required revisions;
+the shared delivery module locates and verifies their bytes.
+
 **Current state:** The five authored kits now live under [dcc/](../dcc/README.md).
 The independent gallery reads the reviewed delivery index. The Lab's separate
 delivery lock lives at `mill-shader-lab/dcc-lock.json`.
@@ -89,9 +93,9 @@ keep its manifest and local payload together under `dcc/deliveries/<id>/` and
 update `dcc/deliveries/index.json`. Only the manifest and index go into Git.
 The next sync must verify that this release can be restored from R2. A Lab
 pin change is separate; the pin records the exact release manifest digest.
-If older required deliveries only exist in a restored tree, use a local input
-folder containing both those deliveries and the candidate and pass it to
-`prepare` and `record` with `--deliveries`.
+Older required deliveries can remain in `.local/dcc/restored` while the new
+candidate lives in `dcc/deliveries`; automatic lookup resolves each independently.
+With `--deliveries`, the supplied directory must contain every required revision.
 
 **Sync after an authorized art change.** From the repository root:
 
@@ -114,8 +118,11 @@ folder containing both those deliveries and the candidate and pass it to
    authored sources and metadata together in Git. Leave the Lab pin unchanged
    unless the user requests a delivery upgrade. Use a new output directory
    each time. To use the new copy immediately, pass it as `--deliveries` to
-   `dcc/gallery.py` or the Lab adapter. If the catalog selection or Lab
-   pin changed, the default build skips a stale `.local/dcc/restored` copy.
+   `dcc/gallery.py` or the Lab adapter. Normal gallery builds use the repository's
+   selected index; an explicit gallery source uses that directory's index. Lab
+   builds always use their own lock. A restored index does not decide whether an
+   exact revision is usable; the loader verifies the required revision's bytes
+   and any pinned manifest digest.
 
 **Restore on a new device.** Use the checkout that contains the verified
 manifest. Restore needs no LFS payloads or upload credential. Run from the
