@@ -1,44 +1,157 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DCC · Asset Library</title>
-<link rel="icon" href="data:,">
-<link rel="stylesheet" href="style.css">
-<script src="catalog.js" defer></script>
-<script src="viewer.js" defer></script>
-<script src="gallery.js" defer></script>
-</head>
-<body>
-<header><p class="eyebrow">ART SOURCE / DELIVERY CATALOG</p><h1>DCC Asset Library</h1><p>Find a scene, a part, or the map that gives it its surface.</p></header>
-<main>
-  <section class="browse" aria-labelledby="browse-title">
-    <h2 id="browse-title">Browse</h2>
-    <div class="filters">
-      <div><label for="query">Search</label><input type="search" id="query" placeholder="Try koi, lacquer, or tail"></div>
-      <div><label for="kind">Kind</label><select id="kind"><option value="">All kinds</option></select></div>
-      <div><label for="tag">Tag</label><select id="tag"><option value="">All tags</option></select></div>
-    </div>
-    <p id="count" role="status"></p>
-    <ul id="results"></ul>
-  </section>
-  <section id="detail" aria-labelledby="asset-title">
-    <p class="eyebrow" id="asset-kind"></p>
-    <h2 id="asset-title" tabindex="-1"></h2>
-    <p id="asset-summary"></p>
-    <div id="preview" hidden>
-      <canvas id="model" width="820" height="520" role="img" aria-label="Isolated mesh preview"></canvas>
-      <p id="viewer-status" role="status"></p>
-      <div class="toolbar">
-        <button id="turn-left" type="button">Rotate left</button><button id="turn-right" type="button">Rotate right</button>
-        <label><input id="uv" type="checkbox"> UV checker</label>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DCC · Asset Library</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="style.css" />
+    <script src="catalog.js" defer></script>
+    <script src="dom.js" defer></script>
+    <script src="catalog-model.js" defer></script>
+    <script src="motion.js" defer></script>
+    <script src="viewer.js" defer></script>
+    <script src="playback.js" defer></script>
+    <script src="thumbnails.js" defer></script>
+    <script src="gallery.js" defer></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to assets</a>
+    <header>
+      <div>
+        <p class="eyebrow">DCC / reviewed delivery catalog</p>
+        <h1>Asset Library</h1>
       </div>
-    </div>
-    <figure id="texture" hidden><img alt=""><figcaption></figcaption></figure>
-    <div id="facts"></div>
-    <div id="connections"></div>
-  </section>
-</main>
-</body>
+      <p class="design-status">Low-fidelity · visual design pending</p>
+    </header>
+    <main id="main">
+      <p id="route-status" role="status" hidden></p>
+      <section id="browse" aria-labelledby="browse-title">
+        <h2 id="browse-title" tabindex="-1">Browse assets</h2>
+        <search class="filters" aria-label="Find assets">
+          <div class="search-field">
+            <label for="query">Search</label
+            ><input
+              type="search"
+              id="query"
+              placeholder="Name, material, tag or ID"
+            />
+          </div>
+          <div>
+            <label for="kind">Kind</label
+            ><select id="kind"></select>
+          </div>
+          <div>
+            <label for="tag">Tag</label
+            ><select id="tag">
+              <option value="">All tags</option>
+            </select>
+          </div>
+          <button id="reset-filters" type="button">Reset filters</button>
+        </search>
+        <p id="count" role="status"></p>
+        <p class="preview-note">
+          Neutral previews of reviewed geometry and color maps. Open an asset to
+          inspect its parts, maps and uses.
+        </p>
+        <ul id="results" class="asset-grid"></ul>
+        <div id="empty" hidden>
+          <h3>No matching assets</h3>
+          <p>Try another name or broaden the filters.</p>
+          <button id="clear-query" type="button">Clear search</button>
+          <button id="all-kinds" type="button">Search all kinds</button>
+        </div>
+      </section>
+      <section id="detail" aria-labelledby="asset-title" hidden>
+        <nav class="detail-nav" aria-label="Asset navigation">
+          <a id="back-results" href="#browse">← Results</a
+          ><span id="result-position"></span
+          ><a id="previous" hidden>← Previous</a><a id="next" hidden>Next →</a>
+        </nav>
+        <div class="inspection">
+          <div class="stage">
+            <p class="eyebrow" id="asset-kind"></p>
+            <h2 id="asset-title" tabindex="-1"></h2>
+            <p id="asset-summary"></p>
+            <div id="preview" hidden>
+              <canvas
+                id="model"
+                width="960"
+                height="640"
+                tabindex="0"
+                role="img"
+                aria-label="Neutral mesh preview"
+                aria-describedby="viewer-help viewer-status"
+              ></canvas>
+              <p id="viewer-status" role="status"></p>
+              <div class="toolbar" id="viewer-controls">
+                <button id="turn-left" type="button">Rotate left</button
+                ><button id="turn-right" type="button">Rotate right</button>
+                <button id="zoom-in" type="button">Zoom in</button
+                ><button id="zoom-out" type="button">Zoom out</button
+                ><button id="reset-view" type="button">Reset view</button>
+                <label><input id="uv" type="checkbox" /> UV checker</label>
+              </div>
+              <section id="motion-controls" aria-label="Object motion" hidden>
+                <div class="motion-row">
+                  <label for="motion-clip">Motion</label>
+                  <select id="motion-clip"></select>
+                  <button id="motion-play" type="button">Play</button>
+                  <button id="motion-rest" type="button">Rest pose</button>
+                </div>
+                <p id="motion-description" class="preview-note"></p>
+                <div class="motion-row">
+                  <label for="motion-time">Scrub</label>
+                  <input id="motion-time" type="range" min="0" max="1000" step="1" value="0" />
+                  <output id="motion-position" for="motion-time"></output>
+                </div>
+                <details id="rig-inspector">
+                  <summary>Inspect a joint</summary>
+                  <div class="motion-row">
+                    <label for="motion-joint">Joint</label>
+                    <select id="motion-joint"></select>
+                    <label for="joint-angle">Angle</label>
+                    <input id="joint-angle" type="range" min="-20" max="20" step="1" value="0" />
+                    <output id="joint-value" for="joint-angle">0°</output>
+                  </div>
+                  <p id="joint-help" class="preview-note"></p>
+                </details>
+              </section>
+              <button id="retry-preview" type="button" hidden>
+                Retry preview
+              </button>
+              <p id="viewer-help" class="preview-note">
+                Drag to orbit. With the preview focused: arrow keys rotate, + /
+                − zoom, Home resets the camera. Rigged objects offer paused motion
+                previews. Base color only; inspect shader effects in the Lab.
+              </p>
+            </div>
+            <figure id="texture" hidden>
+              <img width="512" height="512" alt="" />
+              <figcaption></figcaption>
+            </figure>
+            <section id="material" aria-labelledby="material-title" hidden>
+              <h3 id="material-title">Texture bindings</h3>
+              <p class="preview-note">
+                Original map pixels and binding roles; this is not a shaded
+                material sample.
+              </p>
+              <ul id="bindings" class="map-grid"></ul>
+            </section>
+          </div>
+          <aside aria-label="Asset context">
+            <p id="rights" class="rights"></p>
+            <div id="connections"></div>
+            <details id="source-details">
+              <summary>Source & delivery</summary>
+              <div id="facts"></div>
+            </details>
+          </aside>
+        </div>
+      </section>
+      <noscript
+        >This catalog needs JavaScript for filtering and previews.</noscript
+      >
+    </main>
+  </body>
 </html>

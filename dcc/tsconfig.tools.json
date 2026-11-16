@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "moduleDetection": "force",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "rootDir": "tools",
+    "outDir": "../.local/dcc/compiled/tools"
+  },
+  "include": ["tools/**/*.mts", "types.d.ts"]
+}

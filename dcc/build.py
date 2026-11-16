@@ -59,6 +59,8 @@ def make_candidate(slug: str, output: Path) -> Path:
     if slug == "glasshouse":
         for name in ("sources/pond_objects.py", "sources/placement.py", "sources/scenes/glasshouse.json"):
             fingerprint[name] = digest((ROOT / name).read_bytes())
+    if slug in {"glasshouse", "puppet-yard"}:
+        fingerprint["sources/motions.py"] = digest((ROOT / "sources/motions.py").read_bytes())
     archive = io.BytesIO()
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as bundle:
         for name, content in sorted(files.items()):

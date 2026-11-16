@@ -1,0 +1,17 @@
+{
+  "name": "dcc-asset-library",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "tsc --noEmit && tsc -p tsconfig.tools.json --noEmit",
+    "build": "node tools/build-web.mjs",
+    "test:motion": "npm run build && node test_motion.mjs",
+    "test:browser": "node test_gallery.mjs && node test_playback.mjs",
+    "test": "npm run check && npm run test:motion"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "playwright-core": "1.61.1",
+    "typescript": "7.0.2"
+  }
+}

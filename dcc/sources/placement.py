@@ -1,5 +1,6 @@
 """Place object masters while preserving UVs and joint relationships."""
 
+from copy import deepcopy
 from dataclasses import dataclass
 from math import cos, sin
 
@@ -53,5 +54,9 @@ def place(scene: Scene, master: Scene, instance: Placement) -> list[str]:
             if "parent" in joint:
                 values["parent"] = prefix+joint["parent"]
             joints.append(values)
-        scene.rigs.append({"name": rig["name"] if not prefix else instance.id, "joints": joints})
+        placed = {"name": rig["name"] if not prefix else instance.id, "joints": joints}
+        if "clips" in rig:
+            placed["clips"] = [{**deepcopy(clip), "tracks": {prefix+key: deepcopy(value)
+                                for key,value in clip["tracks"].items()}} for clip in rig["clips"]]
+        scene.rigs.append(placed)
     return list(aliases.values())

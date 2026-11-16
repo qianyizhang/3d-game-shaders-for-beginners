@@ -1,10 +1,10 @@
 {
   "version": 1,
   "scenes": {
-    "puppet-yard": "puppet-yard-d863e0580120bb73",
-    "ferry-landing": "ferry-landing-019be318dee932f6",
+    "puppet-yard": "puppet-yard-fcb13f71f2b55152",
+    "ferry-landing": "ferry-landing-8f7294ac53208ed7",
     "night-market": "night-market-44bdf956b3b29a62",
-    "glasshouse": "glasshouse-6fe1d62e8dd2d304",
+    "glasshouse": "glasshouse-f130110d7d563326",
     "weather-station": "weather-station-eeaac23c79bd6d6c"
   }
 }

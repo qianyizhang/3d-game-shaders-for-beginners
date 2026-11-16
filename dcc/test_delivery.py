@@ -17,9 +17,11 @@ from delivery import (DeliveryInvalid, DeliveryUnavailable, ReleaseRef, delivery
 DCC = Path(__file__).resolve().parent
 
 
-def write_release(root: Path, identifier: str, *, restored: bool = False) -> tuple[ReleaseRef, dict[str, bytes]]:
+def write_release(root: Path, identifier: str, *, restored: bool = False,
+                  scene: str | None = None) -> tuple[ReleaseRef, dict[str, bytes]]:
     """Small portable fixture; consumer checks also exercise the real authored kits."""
-    scene = identifier.rsplit('-', 1)[0]
+    if scene is None:
+        scene = identifier.rsplit('-', 1)[0]
     model = dict(scene=scene, title=scene, summary='Fixture', tags=[], source='sources/fixture.py',
                  geometry='mesh.bin', provenance={}, rigs=[], parts=[], objects={})
     files = {'scene.json': encode(model), 'mesh.bin': b'geometry'}
@@ -189,6 +191,10 @@ class GallerySelectionTest(unittest.TestCase):
         for name in ('delivery.py', 'gallery.py'):
             shutil.copyfile(DCC / name, self.dcc / name)
         shutil.copytree(DCC / 'web', self.dcc / 'web')
+        shutil.copytree(DCC / 'tools', self.dcc / 'tools')
+        for name in ('types.d.ts', 'tsconfig.json', 'tsconfig.tools.json', 'package.json'):
+            shutil.copyfile(DCC / name, self.dcc / name)
+        (self.dcc / 'node_modules').symlink_to(DCC / 'node_modules', target_is_directory=True)
         self.local = self.dcc / 'deliveries'
         self.restored = self.repo / '.local/dcc/restored'
         self.output = self.repo / 'output'
@@ -247,6 +253,75 @@ class GallerySelectionTest(unittest.TestCase):
         self.assertEqual({p.name: p.read_bytes() for p in self.output.iterdir()}, {'catalog.js': b'existing output'})
         subset = self.run_gallery('first')
         self.assertEqual(subset.returncode, 0, subset.stderr)
+
+    def test_source_symlink_outside_dcc_is_rejected_before_output(self):
+        outside = self.repo / 'outside'
+        outside.mkdir()
+        (self.dcc / 'sources').symlink_to(outside, target_is_directory=True)
+        result = self.run_gallery()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(self.output.exists())
+
+    def test_type_error_keeps_last_generated_gallery(self):
+        self.output.mkdir()
+        (self.output / 'catalog.js').write_bytes(b'existing output')
+        source = self.dcc / 'web/catalog-model.ts'
+        source.write_text(source.read_text() + '\nconst invalid: number = "bad";\n')
+        result = self.run_gallery()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Type', result.stderr)
+        self.assertEqual({p.name: p.read_bytes() for p in self.output.iterdir()}, {'catalog.js': b'existing output'})
+
+    def test_invalid_projection_preserves_the_existing_gallery(self):
+        folder = self.local / self.second.id
+        manifest, original = read_release(folder)
+        self.output.mkdir()
+        (self.output / 'catalog.js').write_bytes(b'existing output')
+        for damage in ('wrong-source', 'wrong-tags', 'unknown-part'):
+            with self.subTest(damage=damage):
+                files = dict(original)
+                model = json.loads(files['scene.json'])
+                if damage == 'wrong-source':
+                    model['source'] = 42
+                elif damage == 'wrong-tags':
+                    model['tags'] = 42
+                else:
+                    model['objects'] = {'broken': {'title': 'Broken', 'tags': [], 'parts': ['missing']}}
+                files['scene.json'] = encode(model)
+                stream = io.BytesIO()
+                with zipfile.ZipFile(stream, 'w') as archive:
+                    for name, data in files.items():
+                        archive.writestr(name, data)
+                payload = stream.getvalue()
+                changed = {**manifest, 'archiveSha256': digest(payload),
+                           'files': {name: digest(data) for name, data in files.items()}}
+                (folder / 'payload.zip').write_bytes(payload)
+                (folder / 'manifest.json').write_bytes(encode(changed))
+                result = self.run_gallery()
+                self.assertNotEqual(result.returncode, 0)
+                if damage == 'wrong-source':
+                    self.assertIn('second: missing or invalid working source path', result.stderr)
+                self.assertEqual({p.name: p.read_bytes() for p in self.output.iterdir()}, {'catalog.js': b'existing output'})
+
+    def test_scene_names_cannot_escape_or_collide_with_gallery_files(self):
+        self.output.mkdir()
+        (self.output / 'catalog.js').write_bytes(b'existing output')
+        for i, slug in enumerate(('../escaped', 'catalog', 'gallery')):
+            with self.subTest(slug=slug):
+                ref, _ = write_release(self.local, f'fixture-{i}', scene=slug)
+                self.index(self.local, {slug: ref.id})
+                result = self.run_gallery()
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertIn(slug, result.stderr)
+        self.assertFalse((self.repo / 'escaped.js').exists())
+        self.assertEqual({p.name: p.read_bytes() for p in self.output.iterdir()}, {'catalog.js': b'existing output'})
+
+    def test_missing_compiler_has_setup_action_and_preserves_output(self):
+        (self.dcc / 'node_modules').unlink()  # Only the fixture symlink.
+        result = self.run_gallery()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('npm ci --prefix dcc', result.stderr)
+        self.assertFalse(self.output.exists())
 
     def test_malformed_authoritative_catalog_does_not_use_restored_index(self):
         (self.local / 'index.json').write_text('invalid JSON')

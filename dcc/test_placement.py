@@ -4,6 +4,9 @@ from dataclasses import replace
 import unittest
 
 from sources.pond_objects import make_object
+from sources.placement import Placement, place
+from sources.scene_gallery_geometry import Scene
+from sources.scene_gallery_puppet import BODY, build_puppet
 from sources.scene_gallery_glass_market import build_glasshouse, pond_placements
 
 
@@ -25,6 +28,28 @@ class PlacementTest(unittest.TestCase):
         self.assertEqual(scene.rigs[1]["joints"][0]["pivot"], tuple(base[1].position))
         with self.assertRaisesRegex(ValueError, "Duplicate placed parts"):
             build_glasshouse((*base, planter))
+
+
+    def test_puppet_neck_branches_at_its_shared_torso_join(self):
+        joints = {joint["id"]: joint for joint in build_puppet().rigs[0]["joints"]}
+        self.assertNotIn("parent", joints["dragon-body"])
+        self.assertEqual(joints["dragon-chest"]["pivot"], BODY[2][0])
+        self.assertEqual(joints["dragon-chest"]["parent"], "dragon-body")
+        self.assertEqual(joints["dragon-head"]["parent"], "dragon-chest")
+        self.assertEqual(joints["dragon-tail-1"]["parent"], "dragon-body")
+
+    def test_copied_rig_remaps_clip_tracks_without_mutating_the_master(self):
+        master = make_object("amber-koi")
+        scene = Scene("copies", "Copies", "", "")
+        place(scene, master, Placement("second-koi", "amber-koi", (2, 1, -1), .8, .7))
+        rig = scene.rigs[0]
+        ids = {joint["id"] for joint in rig["joints"]}
+        self.assertEqual(rig["name"], "second-koi")
+        for clip in rig["clips"]:
+            self.assertEqual(set(clip["tracks"]), ids)
+        first = next(iter(rig["clips"][0]["tracks"]))
+        rig["clips"][0]["tracks"][first]["amplitude"] = 999
+        self.assertNotEqual(next(iter(master.rigs[0]["clips"][0]["tracks"].values()))["amplitude"], 999)
 
 
 if __name__ == "__main__":

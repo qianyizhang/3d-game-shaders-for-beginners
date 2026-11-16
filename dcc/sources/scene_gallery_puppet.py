@@ -6,6 +6,7 @@ from math import cos, pi, sin, tau
 from typing import TYPE_CHECKING
 
 from .scene_gallery_geometry import Scene
+from .motions import dragon_clips
 
 if TYPE_CHECKING:
     from .scene_gallery_geometry import Part
@@ -236,7 +237,15 @@ def _dragon(scene: Scene) -> None:
         if i == len(TAIL_DIPPED) - 2:
             _tail_fan(link, TAIL_DIPPED[-1], False)
         hinge(link, TAIL_DIPPED[i][0], axis, amplitude, speed, reverse, (24, 18, 32, 18)[i])
-    scene.rigs.append(dict(name="Water dragon", joints=joints))
+    # A torso root lets the head turn independently of the tail. Preserve every
+    # part binding. Move the chest pivot to its actual join with the torso.
+    head_joint, chest_joint, torso_joint, *tail_joints = joints
+    torso_joint.pop("parent", None)
+    chest_joint["parent"] = torso_joint["id"]
+    chest_joint["pivot"] = BODY[2][0]
+    head_joint["parent"] = chest_joint["id"]
+    joints = [torso_joint, chest_joint, head_joint, *tail_joints]
+    scene.rigs.append(dict(name="Water dragon", joints=joints, clips=dragon_clips(joints)))
 
     raised = scene.part("dragon-raised", "Raised puppet pose", "The same head and body with the tail joints angled up.")
     raised.visible = False

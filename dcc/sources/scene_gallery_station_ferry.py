@@ -3,7 +3,7 @@
 import math
 import random
 
-from .scene_gallery_geometry import Scene
+from .scene_gallery_geometry import Part, Scene
 
 
 def build_station() -> Scene:
@@ -228,6 +228,33 @@ def build_station() -> Scene:
     return scene
 
 
+def river_ridge(part: Part, z: float, height_scale: float, colors: tuple[str, str, str]) -> None:
+    """A continuous closed silhouette with broad, quiet slope planes."""
+    profile = ((-11.44,.12),(-9.5,1.20),(-7.6,1.85),(-5.5,2.30),
+               (-3.8,1.78),(-1.28,1.66),(.45,2.19),(2.0,3.05),
+               (3.5,2.75),(5.0,3.83),(6.4,3.22),(7.85,2.70),
+               (9.5,2.86),(11.3,3.15),(13.3,1.93),(15.79,.10))
+    rows = []
+    for i,(x,h) in enumerate(profile):
+        base = -.95
+        peak = -.64+h*height_scale
+        rows.append(((x,base,z+2.1*height_scale),
+                     (x,base+(peak-base)*.38,z+1.15*height_scale),
+                     (x,peak,z+(.15 if i%3 == 0 else -.20)*height_scale),
+                     (x,base,z-2.1*height_scale)))
+    for i,(left,right) in enumerate(zip(rows,rows[1:])):
+        a,b,c,d = left
+        A,B,C,D = right
+        part.face(colors[0],[a,A,B,b],surface="flat")
+        # Broad facets change the slope without introducing repeated round masses.
+        part.face(colors[1 if i%4 else 2],[b,B,C],surface="flat")
+        part.face(colors[1],[b,C,c],surface="flat")
+        part.face(colors[2],[c,C,D,d],surface="flat")
+        part.face(colors[0],[A,a,d,D],surface="flat")
+    part.face(colors[0],list(rows[0]),surface="flat")
+    part.face(colors[0],list(reversed(rows[-1])),surface="flat")
+
+
 def build_ferry() -> Scene:
     scene = Scene(
         "ferry-landing", "Lantern ferry landing", "ferry-landing",
@@ -426,10 +453,9 @@ def build_ferry() -> Scene:
                                         (x+.54,y+.001,z+.35),(x+.35,y+.001,z+.16)])
     scene.water("ferry-water","Ferry basin water","The basin has its own surface; the ferry hull, pole and pavers remain in the opaque pass.",(-9,-1.35,8.5,10.3))
 
-    hills = scene.part("river-ridges", "Two river ridges", "Layered grey-green ridge silhouettes give depth without competing with the ferry.")
-    for z, scale, color in [(-16.8,1.32,"859c9d"),(-11.5,1.0,"697f7e")]:
-        for x,h,w in [(-5.5,2.3,4.5),(-1.28,1.66,3.8),(2.0,3.05,2.9),(5.0,3.83,3.1),(7.85,2.7,3.2),(11.3,3.15,3.4)]:
-            hills.ellipsoid(color,(x,-.64,z),(w*scale,h*scale,2.1*scale),sides=10,rings=6)
+    hills = scene.part("river-ridges", "Two river ridges", "Continuous faceted slopes and two quiet silhouettes establish distance behind the ferry.")
+    river_ridge(hills,-16.8,1.32,("7c9695","8ba2a0","829c9a"))
+    river_ridge(hills,-11.5,1.0,("607a73","728b80","698176"))
     maple = scene.part("autumn-maple", "Autumn maple", "Angled branches and warm faceted leaf masses frame the edge of the pavilion.")
     trunk = [(-7.5,1.24,-2.05),(-7.25,2.58,-1.95),(-7.58,3.65,-1.94),(-7.22,4.72,-1.99)]
     for a,b,r in zip(trunk,trunk[1:],(.25,.20,.155)):

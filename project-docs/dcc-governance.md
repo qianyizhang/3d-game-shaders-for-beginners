@@ -36,6 +36,11 @@ space, UV set and channel where applicable. Open each texture independently
 and show every use. The first gallery is read only; future browser edits
 produce an explicit variant or patch for review.
 
+The [current gallery implementation](dcc-gallery.md) is explicitly low-fidelity.
+Its accepted workflow is visual browsing followed by focused inspection. Detailed
+visual design is deferred. Keep gallery behavior local until a second consumer
+proves a shared module; the current work does not create a repo-kit package.
+
 ## Git metadata and deliveries
 
 - **Ordinary Git:** Catalog records, procedural masters, provenance and
@@ -130,6 +135,7 @@ repository root:
 
 ```sh
 python3.12 dcc/recovery.py restore --output .local/dcc/restored
+npm ci --prefix dcc
 python3.12 dcc/gallery.py --deliveries .local/dcc/restored
 ```
 

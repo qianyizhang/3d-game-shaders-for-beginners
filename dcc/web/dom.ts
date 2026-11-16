@@ -1,0 +1,66 @@
+/* Check the shared HTML contract once at lookup, rather than guessing element types. */
+(() => {
+  const tags = {
+    main: "main",
+    "route-status": "p",
+    browse: "section",
+    "browse-title": "h2",
+    query: "input",
+    kind: "select",
+    tag: "select",
+    "reset-filters": "button",
+    count: "p",
+    results: "ul",
+    empty: "div",
+    "clear-query": "button",
+    "all-kinds": "button",
+    detail: "section",
+    "back-results": "a",
+    "result-position": "span",
+    previous: "a",
+    next: "a",
+    "asset-kind": "p",
+    "asset-title": "h2",
+    "asset-summary": "p",
+    preview: "div",
+    model: "canvas",
+    "viewer-status": "p",
+    "viewer-controls": "div",
+    "turn-left": "button",
+    "turn-right": "button",
+    "zoom-in": "button",
+    "zoom-out": "button",
+    "reset-view": "button",
+    uv: "input",
+    "motion-controls": "section",
+    "motion-clip": "select",
+    "motion-play": "button",
+    "motion-rest": "button",
+    "motion-description": "p",
+    "motion-time": "input",
+    "motion-position": "output",
+    "rig-inspector": "details",
+    "motion-joint": "select",
+    "joint-angle": "input",
+    "joint-value": "output",
+    "joint-help": "p",
+    "retry-preview": "button",
+    "viewer-help": "p",
+    texture: "figure",
+    material: "section",
+    "material-title": "h3",
+    bindings: "ul",
+    rights: "p",
+    connections: "div",
+    "source-details": "details",
+    facts: "div",
+  } as const;
+  window.DCCElement = <K extends keyof DCC.Elements>(
+    id: K,
+  ): DCC.Elements[K] => {
+    const element = document.getElementById(id);
+    if (!element || element.localName !== tags[id])
+      throw new Error(`Missing ${tags[id]}#${id}`);
+    return element as DCC.Elements[K];
+  };
+})();

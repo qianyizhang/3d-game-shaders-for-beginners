@@ -60,6 +60,7 @@ existing clean-restore publication and snapshot checks remain in force.
 Run from the repository root with local delivery payloads available:
 
 ```sh
+npm ci --prefix dcc
 python3.12 -m unittest discover -s dcc
 python3.12 mill-shader-lab/test/dcc_adapter.py
 ```
