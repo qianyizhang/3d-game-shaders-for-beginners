@@ -43,7 +43,7 @@ rights and review gates remain project-owned.
 ```sh
 npm ci --prefix dcc
 npm --prefix dcc test
-python3.12 -m unittest discover -s dcc
+DCC_VERIFY_SELECTED=1 python3.12 -m unittest discover -s dcc
 python3.12 dcc/gallery.py
 npm --prefix dcc run test:browser
 ```

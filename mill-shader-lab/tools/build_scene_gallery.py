@@ -128,4 +128,4 @@ if __name__ == "__main__":
     try:
         main()
     except (OSError, ValueError, KeyError, zipfile.BadZipFile) as error:
-        raise SystemExit(f"Lab asset preparation failed: {error}")
+        raise SystemExit(f"Lab asset preparation failed: {error}") from error

@@ -8,11 +8,10 @@ export function createFallbackRenderer(canvas) {
   const W=860,H=520;
   const before=document.createElement('canvas'),after=document.createElement('canvas');
   before.width=after.width=W;before.height=after.height=H;
-  let lesson={shader:0,beforeShader:1,post:0},split=.5,rough=.3,metal=.11,fog=.19,bloom=1.55, angle=0;
+  let lesson={shader:0,beforeShader:1,post:0},split=.5,rough=.3,fog=.19,bloom=1.55, angle=0;
   let dirty=true;
   const ref=before.getContext('2d',{willReadFrequently:true});
   const fx=after.getContext('2d',{willReadFrequently:true});
-  function colors(id) {return id===3?['#5f998f','#2c5c65','#0f333d']:['#6cb6bc','#23727d','#082d41'];}
   const grd=(c,x,y,r,stops)=>{
     const g=c.createRadialGradient(x-r*.25,y-r*.4,2,x,y,r);
     for(const [p,col] of stops)g.addColorStop(p,col);
@@ -113,7 +112,7 @@ export function createFallbackRenderer(canvas) {
     stats:{hdr:false,resolution:'Illustrative Canvas2D',gamma:'not a shader renderer'},
     isFallback:true,
     setLesson(v){lesson=v;dirty=true;},setSplit(v){split=+v;dirty=true;},
-    setRoughness(v){rough=+v;dirty=true;},setMetallic(v){metal=+v;dirty=true;},
+    setRoughness(v){rough=+v;dirty=true;},setMetallic(){},
     setFogDensity(v){fog=+v;dirty=true;},setBloomStrength(v){bloom=+v;dirty=true;},
     resetCamera(){angle=0;dirty=true;},setPlaying(){},renderOnce(){draw();},dispose(){}
   };

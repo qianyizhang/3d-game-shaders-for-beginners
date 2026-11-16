@@ -45,9 +45,11 @@ details remain available; the reviewed delivery does not follow working edits.
   and decoded payloads go under `.local/dcc/gallery/`; neither belongs in Git.
 
 Use the [rulebook](../project-docs/dcc-governance.md#remote-object-recovery)
-to review and promote a candidate, sync it, or restore assets. After restoring
-the art, run `python3.12 -m unittest discover -s dcc` for the local contracts.
-The recovery tests use an in-memory service and send no project data.
+to review and promote a candidate, sync it, or restore assets. After
+`npm ci --prefix dcc`, run `python3.12 -m unittest discover -s dcc` for the
+local contracts. The tests build their own fixtures; recovery uses an in-memory
+service and sends no project data. After restoring reviewed deliveries, set
+`DCC_VERIFY_SELECTED=1` when running the suite to verify the selected payloads.
 
 ## Gallery development
 

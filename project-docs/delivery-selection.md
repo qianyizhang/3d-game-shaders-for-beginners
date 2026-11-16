@@ -57,7 +57,7 @@ existing clean-restore publication and snapshot checks remain in force.
 
 ## Verification
 
-Run from the repository root with local delivery payloads available:
+Run from the repository root; the default suite builds its own fixtures:
 
 ```sh
 npm ci --prefix dcc
@@ -72,7 +72,9 @@ round trip uses an in-memory remote and deliberately selects a revision distinct
 from its Lab pin, regardless of the checkout's catalog. It retains both revisions,
 working artwork and standalone masters.
 
-For prepared asset changes, also run the [Lab scene lesson gate](mill-shader-lab-verification.md#run-the-checks).
+With restored reviewed payloads, run `make check-reviewed` to verify the
+gallery selection and prepare all exact Lab pins. For prepared asset changes,
+also run the [Lab scene lesson gate](mill-shader-lab-verification.md#run-the-checks).
 Use matched generated-output comparisons to distinguish selection changes from
 rendering changes. Browser and output checks from a shared working tree do not
 replace checking an isolated commit candidate when unrelated edits are excluded.

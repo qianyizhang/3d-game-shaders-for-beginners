@@ -6,7 +6,6 @@ import io
 import json
 import os
 from pathlib import Path
-import re
 import sys
 import tempfile
 import time
@@ -449,6 +448,6 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except HTTPError as error:
-        raise SystemExit(f"Object Library HTTP {error.code}; stopped without retrying")
+        raise SystemExit(f"Object Library HTTP {error.code}; stopped without retrying") from error
     except (OSError, ValueError, KeyError, IncompleteRead, zipfile.BadZipFile) as error:
-        raise SystemExit(f"DCC recovery: {error}")
+        raise SystemExit(f"DCC recovery: {error}") from error

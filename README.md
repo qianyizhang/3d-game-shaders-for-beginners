@@ -66,6 +66,9 @@ the original mill locally. The [scene and part gallery](project-docs/scene-galle
 shows five authored kits you can restore and explore without converting the
 original mill. The [DCC library](dcc/README.md) owns the art and recovery setup.
 
+See [repository checks and delivery](project-docs/checks-and-delivery.md) for
+the stack, local checks and what GitHub Actions builds.
+
 ## License
 
 The included license applies only to the software portion of 3D Game Shaders For Beginners—

@@ -49,8 +49,8 @@ if [[ "$action" == build ]]; then
   fi
   tmp="$(mktemp "${binary}.XXXXXXXX")"
   trap 'rm -f -- "$tmp"' EXIT
-  clang++ -arch "$arch" -std=c++11 -O2 \
-    -I"$sdk/include" "$demo_dir/src/main.cxx" \
+  clang++ -arch "$arch" -std=c++11 -O2 -Wall -Wextra -Werror \
+    -isystem "$sdk/include" "$demo_dir/src/main.cxx" \
     -L"$sdk/lib" -lp3framework -lpanda -lpandafx -lpandaexpress -lpandaphysics \
     -lp3dtoolconfig -lp3dtool -o "$tmp"
   chmod +x "$tmp"

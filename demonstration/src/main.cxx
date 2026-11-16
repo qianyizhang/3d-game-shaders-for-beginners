@@ -8,11 +8,10 @@
 #include <random>
 #include <string>
 #include <chrono>
-#include <thread>
 #include <algorithm>
 #include <iostream>
 
-#include "pandaFramework.h" // Panda3D 1.10.9
+#include "pandaFramework.h"
 #include "renderBuffer.h"
 #include "load_prc_file.h"
 #include "pStatClient.h"
@@ -1341,7 +1340,7 @@ int main
 
   graphicsOutput->set_sort(chromaticAberrationBuffer->get_sort() + 1);
 
-  int showBufferIndex = 0;
+  size_t showBufferIndex = 0;
 
   std::vector<std::tuple<std::string, PT(GraphicsOutput), int>> bufferArray =
     { std::make_tuple("Positions 0",          geometryBuffer0,           0)
@@ -1638,8 +1637,7 @@ int main
     if (keyDebounced) {
       if (tabDown) {
         if (shiftDown) {
-          showBufferIndex -= 1;
-          if (showBufferIndex < 0) showBufferIndex = bufferArray.size() - 1;
+          showBufferIndex = showBufferIndex == 0 ? bufferArray.size() - 1 : showBufferIndex - 1;
         } else {
           showBufferIndex += 1;
           if (showBufferIndex >= bufferArray.size()) showBufferIndex = 0;
@@ -2100,7 +2098,7 @@ int main
     };
 
   auto beforeFrameRunner =
-    [](GenericAsyncTask* task, void* arg)
+    [](GenericAsyncTask*, void* arg)
       -> AsyncTask::DoneStatus {
           (*static_cast<decltype(beforeFrame)*>(arg))();
           return AsyncTask::DS_cont;
@@ -2404,11 +2402,11 @@ float animateLights
   updateWindowLight("windowLight1");
   updateWindowLight("windowLight2");
 
-  if (mixFactor >= 0.3 && mixFactor <= 0.35 && closedShutters || midnightDown) {
+  if ((mixFactor >= 0.3 && mixFactor <= 0.35 && closedShutters) || midnightDown) {
     closedShutters = false;
 
     shuttersAnimationCollection.play("open-shutters");
-  } else if (mixFactor >= 0.6 && mixFactor <= 0.7 && !closedShutters || middayDown) {
+  } else if ((mixFactor >= 0.6 && mixFactor <= 0.7 && !closedShutters) || middayDown) {
     closedShutters = true;
 
     shuttersAnimationCollection.play("close-shutters");
@@ -2827,7 +2825,7 @@ void squashGeometry
   squashNP.reparent_to(environmentNP);
 
   NodePathCollection squashCollection = environmentNP.find_all_matches("**/*");
-  for (int i = 0; i < squashCollection.size(); ++i) {
+  for (size_t i = 0; i < squashCollection.size(); ++i) {
     if  (   squashCollection[i].get_name() == "wheel-lp"
         ||  squashCollection[i].get_name() == "water-lp"
         ||  squashCollection[i].get_name() == "squash"

@@ -1,61 +1,47 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-SCRIPT_PATH="$(cd "$(dirname "$0")"; pwd -P)"
-MAIN_TITLE="3D Game Shaders For Beginners"
-REPO_URL="https://github.com/lettier/3d-game-shaders-for-beginners"
-AUTHOR="David Lettier"
-CSS="style.css"
+docs_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+output="${1:-$docs_dir}"
+main_title="3D Game Shaders For Beginners"
+upstream="https://github.com/lettier/3d-game-shaders-for-beginners"
+fork="https://github.com/qianyizhang/3d-game-shaders-for-beginners"
+pandoc="${PANDOC:-pandoc}"
+highlight="--highlight-style=breezedark"
+help="$("$pandoc" --help)"
+if [[ "$help" == *--syntax-highlighting* ]]; then
+  highlight="--syntax-highlighting=breezedark"
+fi
 
-for f in $SCRIPT_PATH/../sections/*
+mkdir -p -- "$output"
+stage="$(mktemp -d "$output/.docs-build.XXXXXXXX")"
+trap 'rm -rf -- "$stage"' EXIT
+
+render() {
+  local source="$1" file="$2" title="$3"
+  "$pandoc" \
+    -f gfm -t html5 --wrap=none "$highlight" \
+    --template="$docs_dir/_template.html5" \
+    --metadata pagetitle="$title" --metadata author-meta="David Lettier" \
+    --metadata css="style.css" "$source" |
+    sed -E \
+      -e 's|href="(sections/)?([a-z-]+)\.md([#?][^"]*)?"|href="\2.html\3"|g' \
+      -e 's|href="\.\./README\.md"|href="index.html"|g' \
+      -e "s|href=\"\.\./demonstration/([^\"]*)\"|href=\"$upstream/blob/master/demonstration/\1\" target=\"_blank\" rel=\"noopener noreferrer\"|g" \
+      -e "s|href=\"((project-docs\|dcc)/[^\"]*)\"|href=\"$fork/blob/master/\1\"|g" \
+      > "$stage/$file"
+}
+
+for source in "$docs_dir"/../sections/*.md
 do
-  echo "$f"
-  file=$(basename -- "$f")
-  file_name="${file%.*}"
-  title=$(echo "$file_name" | sed -r 's/-/ /g' | sed -e 's/\b\(.\)/\u\1/g')
-  if [ "$title" == "Ssao" ]
-  then
-    title="SSAO"
-  fi
-  if [ "$title" == "Glsl" ]
-  then
-    title="GLSL"
-  fi
-  $PANDOC \
-    -f gfm \
-    -t html5 \
-    --highlight-style=breezedark \
-    --template=$SCRIPT_PATH/_template.html5 \
-    $f \
-    --metadata pagetitle="$title | $MAIN_TITLE" \
-    --metadata author-meta="$AUTHOR" \
-    --metadata css=$CSS \
-    -o "$SCRIPT_PATH/$file_name.html"
+  name="${source##*/}"
+  name="${name%.md}"
+  case "$name" in
+    ssao) title=SSAO ;;
+    glsl) title=GLSL ;;
+    *) title="$(tr -- '-' ' ' <<< "$name" | awk '{for (i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print}')";;
+  esac
+  render "$source" "$name.html" "$title | $main_title"
 done
-
-$PANDOC \
-  -f gfm \
-  -t html5 \
-  --highlight-style=breezedark \
-  --template=$SCRIPT_PATH/_template.html5 \
-  $SCRIPT_PATH/../README.md \
-  --metadata pagetitle="$MAIN_TITLE" \
-  --metadata author-meta="$AUTHOR" \
-  --metadata css=$CSS \
-  -o "$SCRIPT_PATH/index.html"
-
-for i in {1..3}
-do
-  for f in $SCRIPT_PATH/*
-  do
-    file=$(basename -- "$f")
-    file_name="${file%.*}"
-    file_ext="${file##*.}"
-    if [ "$file_ext" == "html" ]
-    then
-      echo $f
-      sed -i -E 's/href="(sections\/)?([a-z-]+)\.md(.*)"/href="\2\.html\3"/g' $f
-      sed -i -E 's/href="\.\.\/README.md"/href="index.html"/g' $f
-      sed -i -E 's+<a href="\.\.\/demonstration\/(.*)">+<a href="'$REPO_URL'\/blob\/master\/demonstration\/\1" target="_blank" rel="noopener noreferrer">+g' $f
-    fi
-  done
-done
+render "$docs_dir/../README.md" index.html "$main_title"
+mv -f -- "$stage"/*.html "$output/"

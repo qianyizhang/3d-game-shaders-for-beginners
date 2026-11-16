@@ -22,12 +22,11 @@ Run the executable from the `demonstration` directory, where it can find its sha
 
 ### Mac
 
-Use the SDK path from the build step. Set `PANDA_PRC_DIR` to select the demo configuration directory.
+From the repository root, use the same launcher and SDK as the build.
+The launcher sets the asset directory and Panda3D configuration.
 
 ```bash
-PANDA3D=/Library/Developer/Panda3D
-PANDA_PRC_DIR="$PWD" DYLD_LIBRARY_PATH="$PANDA3D/lib" \
-  ./3d-game-shaders-for-beginners
+./demonstration/macos.sh run
 ```
 
 ### Windows

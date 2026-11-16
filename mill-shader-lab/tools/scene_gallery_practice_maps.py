@@ -50,10 +50,10 @@ def write_resources(root: Path) -> None:
         ("day", (1.06, 1.00, .89), (.018, .010, .016)),
         ("night", (.73, .85, 1.04), (.019, .029, .062)),
     ):
-        def lut(x: int, y: int) -> tuple[int, int, int]:
+        def lut(x: int, y: int, gain: tuple[float, ...] = scale, bias: tuple[float, ...] = offset) -> RGB:
             # File rows start at green=0; upload flips Y. Shader reads 15-green.
             rgb = ((x % 16)/15, y/15, (x//16)/15)
-            return tuple(round(255*min(1, max(0, v*s+b))) for v, s, b in zip(rgb, scale, offset))
+            return tuple(round(255*min(1, max(0, v*s+b))) for v, s, b in zip(rgb, gain, bias, strict=True))
         png(maps / f"practice-{name}-lut.png", 256, 16, lut)
 
     def flow(x: int, y: int) -> tuple[int, int, int]:

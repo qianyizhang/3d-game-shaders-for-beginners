@@ -63,4 +63,4 @@ if __name__ == "__main__":
     try:
         main()
     except (OSError, ValueError, KeyError) as error:
-        raise SystemExit(f"DCC gallery failed: {error}")
+        raise SystemExit(f"DCC gallery failed: {error}") from error

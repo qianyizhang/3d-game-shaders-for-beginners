@@ -9,5 +9,10 @@ blends/**
 !blends/mill-scene/mill-scene-low-poly-backup.blend
 
 /.local/
+/.artifacts/
 /.env.local
 .DS_Store
+
+/node_modules/
+__pycache__/
+.ruff_cache/

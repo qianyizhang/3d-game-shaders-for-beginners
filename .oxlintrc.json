@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error"
+  },
+  "ignorePatterns": ["**/dist/**", "**/node_modules/**", ".local/**"],
+  "overrides": [
+    {
+      "files": ["shader-field-guide/src/**/*.js"],
+      "env": { "browser": true },
+      "rules": { "no-undef": "error" }
+    }
+  ]
+}

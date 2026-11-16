@@ -62,10 +62,14 @@ inspection-only work and missing-attachment failure/recovery without drawing.
 The full browser gate also checks live explanations and source/image agreement,
 including disabled effects, A/B edits and HDR/SDR bloom.
 
+Run `python3.12 test/dcc_adapter.py` from `mill-shader-lab/` for the adapter
+contract. It generates its own fixtures and exercises pin verification and
+incompatible bindings. From the repository root, `make check-reviewed` checks
+the actual locked deliveries after restore.
+
 After [preparing the scene kits](scene-gallery.md#run-locally), run
-`python3.12 test/dcc_adapter.py` and `npm run build && node test/scene-lessons.mjs`
-from `mill-shader-lab/`. The adapter check exercises the pins and a missing joint.
-This checks all 20 shared lessons on each kit, including the GPU buffers,
+`npm run build && node test/scene-lessons.mjs` from `mill-shader-lab/`. This
+checks all 20 shared lessons on each kit, including the GPU buffers,
 material and normal comparisons, and both frozen pose comparisons. Optional
 scene slugs narrow the run during art and camera refinement.
 

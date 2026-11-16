@@ -61,7 +61,7 @@ function selectLesson(id) {
     if(enabled)renderer[control.setter](control.value);
   }
   $('effectParamValue').textContent=enabled?control.value.toFixed(2):'—';
-  $('metallic').disabled=!renderer||l.id==='blinn';
+  $('metallic').disabled=!renderer||illustration||l.id==='blinn';
   renderer?.setLesson(l);
   history.replaceState(null,'',`#${id}`);
 }

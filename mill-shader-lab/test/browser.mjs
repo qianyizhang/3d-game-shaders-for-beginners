@@ -8,7 +8,9 @@ export async function withLab(run) {
     const address = server.httpServer.address();
     assert.ok(address && typeof address === "object", "Expected a loopback preview address");
     const base = new URL(`http://127.0.0.1:${address.port}/`);
-    const browser = await chromium.launch({ channel: "chrome", headless: true });
+    const browser = await chromium.launch(process.env.CI
+      ? { args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] }
+      : { channel: "chrome" });
     try {
       const external = new Set();
       const context = async options => {

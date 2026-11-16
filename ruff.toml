@@ -1,0 +1,13 @@
+target-version = "py312"
+force-exclude = true
+extend-exclude = [".local", ".artifacts"]
+
+[lint]
+# Correctness and failure paths; the original lesson builders keep their existing style.
+select = ["E4", "E9", "F", "B006", "B007", "B008", "B017", "B023", "B904"]
+
+[lint.per-file-ignores]
+# Deliveries hash the builder and masters. Fix with the next reviewed art update.
+"dcc/build.py" = ["B904"] # CLI exit without changing candidate identity
+"dcc/sources/scene_gallery_geometry.py" = ["B023"] # albedo is called before the next iteration
+"dcc/sources/scene_gallery_station_ferry.py" = ["F841"] # unused color in build_ferry

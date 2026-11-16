@@ -2,6 +2,7 @@
 
 import io
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -11,7 +12,7 @@ import unittest
 from unittest.mock import patch
 import zipfile
 
-from delivery import (DeliveryInvalid, DeliveryUnavailable, ReleaseRef, delivery_roots,
+from delivery import (FORMAT, DeliveryInvalid, DeliveryUnavailable, ReleaseRef, delivery_roots,
                       digest, encode, load_release, read_release)
 
 DCC = Path(__file__).resolve().parent
@@ -173,6 +174,22 @@ class DeliveryTest(unittest.TestCase):
         override = self.root / 'explicit'
         self.assertEqual(delivery_roots(self.root, override), (override,))
 
+    def test_tracked_delivery_manifests_match_catalog_and_lab_lock(self):
+        index = json.loads((DCC / 'deliveries/index.json').read_text())['scenes']
+        pins = json.loads((DCC.parent / 'mill-shader-lab/dcc-lock.json').read_text())['scenes']
+        refs = [(scene, ReleaseRef(identifier)) for scene, identifier in index.items()]
+        refs.extend((scene, ReleaseRef(pin['id'], pin['manifestSha256'])) for scene, pin in pins.items())
+        for scene, ref in refs:
+            with self.subTest(scene=scene, identifier=ref.id):
+                raw = (DCC / 'deliveries' / ref.id / 'manifest.json').read_bytes()
+                manifest = json.loads(raw)
+                self.assertEqual((manifest['id'], manifest['scene'], manifest['format']),
+                                 (ref.id, scene, FORMAT))
+                if ref.manifest_sha256 is not None:
+                    self.assertEqual(digest(raw), ref.manifest_sha256)
+
+    @unittest.skipUnless(os.environ.get('DCC_VERIFY_SELECTED') == '1',
+                         'Set DCC_VERIFY_SELECTED=1 after restoring reviewed payloads')
     def test_selected_deliveries_match_catalog(self):
         index = json.loads((DCC / 'deliveries/index.json').read_text())['scenes']
         for scene, identifier in index.items():

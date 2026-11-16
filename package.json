@@ -1,0 +1,16 @@
+{
+  "name": "shader-tutorial-checks",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "oxlint --deny-warnings --report-unused-disable-directives dcc mill-shader-lab shader-field-guide/src tools",
+    "test:browser": "node tools/browser-smoke.mjs"
+  },
+  "engines": {
+    "node": "24.x"
+  },
+  "devDependencies": {
+    "oxlint": "1.93.0",
+    "playwright-core": "1.61.1"
+  }
+}

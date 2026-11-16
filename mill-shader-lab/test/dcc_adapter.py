@@ -12,7 +12,7 @@ import unittest
 LAB = Path(__file__).resolve().parents[1]
 DCC = LAB.parent / 'dcc'
 sys.path.insert(0, str(LAB.parent))
-from dcc.delivery import ReleaseRef, delivery_roots, digest, encode, load_release  # noqa: E402
+from dcc.delivery import delivery_roots, digest, encode, read_release  # noqa: E402
 
 
 class AdapterTest(unittest.TestCase):
@@ -20,9 +20,19 @@ class AdapterTest(unittest.TestCase):
     def setUpClass(cls):
         cls.lock = json.loads((LAB / 'dcc-lock.json').read_text())
         cls.releases = {}
-        for slug, pin in cls.lock['scenes'].items():
-            release = load_release(ReleaseRef(pin['id'], pin['manifestSha256']), roots=delivery_roots(LAB.parent))
-            cls.releases[slug] = ((release.folder / 'manifest.json').read_bytes(), release.files)
+        # Build fixtures before staging the isolated adapter. Keep the Lab's real
+        # required bindings, but pin fixture manifests rather than reviewed bytes.
+        with tempfile.TemporaryDirectory() as temp:
+            subprocess.run([sys.executable, str(DCC / 'build.py'), '--output', temp,
+                            *cls.lock['scenes']], check=True, stdout=subprocess.DEVNULL)
+            for folder in sorted(Path(temp).iterdir()):
+                manifest, files = read_release(folder)
+                raw = (folder / 'manifest.json').read_bytes()
+                slug = manifest['scene']
+                cls.lock['scenes'][slug].update(id=folder.name, manifestSha256=digest(raw))
+                cls.releases[slug] = (raw, files)
+        if cls.releases.keys() != cls.lock['scenes'].keys():
+            raise ValueError('Missing DCC adapter test fixtures')
 
     def setUp(self):
         temp = tempfile.TemporaryDirectory()

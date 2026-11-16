@@ -61,7 +61,7 @@
         `Single joint from rest · ±${selected.poseLimit}° · child parts follow their parent.`;
     }
     // Keep the selected value before rest clears the previous pose.
-    by("motion-clip").onchange = (event) => {
+    by("motion-clip").onchange = () => {
       const value = by("motion-clip").value;
       rest();
       clip = value;
@@ -81,7 +81,7 @@
         frame = requestAnimationFrame(tick);
       }
     };
-    by("motion-time").oninput = (event) => {
+    by("motion-time").oninput = () => {
       const position = by("motion-time").valueAsNumber;
       pause();
       time = (position / 1000) * duration();
@@ -89,7 +89,7 @@
       labels();
     };
     by("motion-joint").onchange = joint;
-    by("joint-angle").oninput = (event) => {
+    by("joint-angle").oninput = () => {
       pause();
       clip = "";
       time = 0;
